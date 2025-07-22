@@ -333,7 +333,7 @@ def calcular_taxas(taxa_mensal):
 def calcular_valor_presente(valor_futuro, taxa, dias):
     """Calcula o valor presente de um fluxo de caixa futuro."""
     try:
-        if dias <= 0 or taxa <= 0:
+        if dias <= 0 or taxa <= 0: # Se a taxa for 0, o valor presente é o próprio valor futuro
             return valor_futuro
         # A taxa é mensal, então precisamos ajustar o expoente para dias
         # Assumimos 30 dias por mês para o cálculo de valor presente diário
@@ -391,10 +391,16 @@ def determinar_modo_calculo(modalidade):
         return 1
 
 def calcular_parcela(valor, taxa, periodos):
-    """Calcula o valor da parcela usando a função PMT do numpy-financial."""
+    """
+    Calcula o valor da parcela usando a função PMT do numpy-financial.
+    Corrigido para lidar com taxa de juros zero.
+    """
     try:
-        if periodos <= 0 or taxa <= 0 or valor <= 0:
+        if periodos <= 0 or valor <= 0: # Removida a condição 'taxa <= 0' daqui
             return 0.0
+        
+        if taxa == 0: # Se a taxa for zero, a parcela é o valor dividido pelos períodos
+            return round(valor / periodos, 2)
             
         parcela = npf.pmt(taxa, periodos, -valor)
         
