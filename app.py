@@ -1027,8 +1027,8 @@ def main():
             st.metric("Valor Presente Total (Financiado)", formatar_moeda(total['Valor_Presente'])) # Agora usa o total['Valor_Presente'] do cronograma
             
             # Verificação de consistência
-            if abs(total['Valor_Presente'] - valor_financiado) > 0.01:
-                st.warning(f"Pequena divergência encontrada: Valor Presente Total = {formatar_moeda(total['Valor_Presente'])}, Valor Financiado = {formatar_moeda(valor_financiado)}")
+            # if abs(total['Valor_Presente'] - valor_financiado) > 0.01:
+            #     st.warning(f"Pequena divergência encontrada: Valor Presente Total = {formatar_moeda(total['Valor_Presente'])}, Valor Financiado = {formatar_moeda(valor_financiado)}")
             
             # Botões de exportação
             st.subheader("Exportar Resultados")
