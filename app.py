@@ -342,14 +342,13 @@ def calcular_valor_presente(valor_futuro, taxa, dias):
         return valor_futuro
 
 def ajustar_data_vencimento(data, periodo, num_periodo=1, dia_vencimento=None):
-    """Ajusta a data de vencimento com base no período e número de períodos."""
+    """
+    Ajusta a data de vencimento com base no período e número de períodos.
+    Esta função foi revertida para a lógica original do usuário.
+    """
     try:
         if not isinstance(data, datetime):
             data = datetime.combine(data, datetime.min.time())
-            
-        # O comportamento original do usuário era usar o ultimo_dia_mes se dia_vencimento fosse None
-        # Revertendo para o comportamento original.
-        target_day = dia_vencimento if dia_vencimento is not None else data.day 
             
         if periodo == "mensal":
             total_meses = data.month + num_periodo
@@ -357,33 +356,26 @@ def ajustar_data_vencimento(data, periodo, num_periodo=1, dia_vencimento=None):
             mes = (total_meses - 1) % 12 + 1
             
             ultimo_dia_mes = (datetime(ano, mes + 1, 1) - timedelta(days=1)).day if mes < 12 else 31
-            dia = min(target_day, ultimo_dia_mes)
+            dia = min(dia_vencimento, ultimo_dia_mes) if dia_vencimento else ultimo_dia_mes # Lógica original
             
             return datetime(ano, mes, dia)
             
         elif periodo == "semestral":
-            # Adiciona meses para calcular a nova data
-            total_meses = data.month + (6 * num_periodo)
-            ano = data.year + (total_meses - 1) // 12
-            mes = (total_meses - 1) % 12 + 1
+            nova_data = data + timedelta(days=180 * num_periodo)
+            ultimo_dia_mes = (datetime(nova_data.year, nova_data.month % 12 + 1, 1) - timedelta(days=1)).day
+            dia = min(dia_vencimento, ultimo_dia_mes) if dia_vencimento else ultimo_dia_mes # Lógica original
             
-            ultimo_dia_mes = (datetime(ano, mes + 1, 1) - timedelta(days=1)).day if mes < 12 else 31
-            dia = min(target_day, ultimo_dia_mes)
-            
-            return datetime(ano, mes, dia)
+            return datetime(nova_data.year, nova_data.month, dia)
             
         elif periodo == "anual":
-            # Adiciona anos diretamente
             nova_data = data.replace(year=data.year + num_periodo)
-            
-            ultimo_dia_mes = (datetime(nova_data.year, nova_data.month % 12 + 1, 1) - timedelta(days=1)).day if nova_data.month < 12 else 31
-            dia = min(target_day, ultimo_dia_mes)
+            ultimo_dia_mes = (datetime(nova_data.year, nova_data.month % 12 + 1, 1) - timedelta(days=1)).day
+            dia = min(dia_vencimento, ultimo_dia_mes) if dia_vencimento else ultimo_dia_mes # Lógica original
             
             return datetime(nova_data.year, nova_data.month, dia)
             
     except ValueError:
-        # Fallback para um dia válido se houver erro (ex: 31 de fevereiro)
-        return datetime(data.year, data.month, 28) # Ajusta para o dia 28
+        return datetime(data.year, data.month, 28)
 
 def determinar_modo_calculo(modalidade):
     """Determina o modo de cálculo com base na modalidade selecionada."""
@@ -450,24 +442,30 @@ def atualizar_baloes(modalidade, qtd_parcelas, tipo_balao=None):
 def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                      qtd_parcelas, qtd_baloes, modalidade, tipo_balao,
                      data_entrada, taxas):
+    """
+    Gera o cronograma de pagamentos (parcelas e balões).
+    Esta função foi revertida para a lógica original do usuário.
+    """
     cronograma = []
     try:
         if not isinstance(data_entrada, datetime):
             data_entrada = datetime.combine(data_entrada, datetime.min.time())
             
         saldo_devedor = float(valor_financiado)
-        total_valor_presente = 0
+        total_valor_presente = 0 # Esta variável é usada para o total final, como no original
         dia_vencimento = data_entrada.day
         
         parcelas = []
         baloes = []
         
-        # Taxa apropriada para balões (usada no cálculo de juros do balão no modo só balão)
+        # Taxa apropriada para balões (como no original)
         taxa_balao_aplicada = taxas['anual'] if tipo_balao == 'anual' else taxas['semestral'] if tipo_balao == 'semestral' else 0
         
-        # Copia os valores de entrada para não modificá-los diretamente dentro do loop
-        _valor_parcela_calculo = valor_parcela
-        _valor_balao_calculo = valor_balao
+        # IMPORTANTE: Replicando o comportamento original onde valor_parcela e valor_balao
+        # são modificados DENTRO do loop para refletir os ajustes da amortização.
+        # Isso afeta o cálculo do juros e da amortização para as parcelas/balões subsequentes.
+        _valor_parcela_atual = valor_parcela # Variável interna para ser modificada
+        _valor_balao_atual = valor_balao # Variável interna para ser modificada
 
         if modalidade == "mensal":
             for i in range(1, qtd_parcelas + 1):
@@ -475,19 +473,15 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                 dias_corridos = (data_vencimento_parcela - data_entrada).days
                 
                 juros = saldo_devedor * taxas['mensal']
-                amortizacao = _valor_parcela_calculo - juros
+                amortizacao = _valor_parcela_atual - juros
                 
-                # A lógica original do usuário modificava valor_parcela aqui.
-                # Para replicar o comportamento, usamos uma variável temporária para a linha atual
-                # e ajustamos o valor que será adicionado à lista.
-                valor_parcela_linha = _valor_parcela_calculo
                 if amortizacao > saldo_devedor:
                     amortizacao = saldo_devedor
-                    valor_parcela_linha = amortizacao + juros # Ajusta o valor para esta linha específica
+                    _valor_parcela_atual = amortizacao + juros # Modifica o valor para a próxima iteração
                 
                 saldo_devedor -= amortizacao
                 
-                valor_presente = calcular_valor_presente(valor_parcela_linha, taxas['mensal'], dias_corridos)
+                valor_presente = calcular_valor_presente(_valor_parcela_atual, taxas['mensal'], dias_corridos)
                 total_valor_presente += valor_presente
                 
                 parcelas.append({
@@ -496,9 +490,9 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                     "Data_Vencimento": data_vencimento_parcela.strftime('%d/%m/%Y'),
                     "Data_Pagamento": data_entrada.strftime('%d/%m/%Y'),
                     "Dias": dias_corridos,
-                    "Valor": valor_parcela_linha, # Usa o valor ajustado para esta linha
+                    "Valor": _valor_parcela_atual,
                     "Valor_Presente": valor_presente,
-                    "Desconto_Aplicado": valor_parcela_linha - valor_presente
+                    "Desconto_Aplicado": _valor_parcela_atual - valor_presente
                 })
         
         elif modalidade in ["só balão anual", "só balão semestral"]:
@@ -508,19 +502,17 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                 data_vencimento_balao = ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento)
                 dias_corridos = (data_vencimento_balao - data_entrada).days
                 
-                juros = saldo_devedor * taxa_balao_aplicada # Usar a taxa anual/semestral para juros do balão
-                amortizacao = _valor_balao_calculo - juros
+                juros = saldo_devedor * taxa_balao_aplicada # Usar taxa de balão anual/semestral para juros
+                amortizacao = _valor_balao_atual - juros
                 
-                # Lógica original do usuário
-                valor_balao_linha = _valor_balao_calculo
                 if amortizacao > saldo_devedor:
                     amortizacao = saldo_devedor
-                    valor_balao_linha = amortizacao + juros # Ajusta o valor para esta linha específica
+                    _valor_balao_atual = amortizacao + juros # Modifica o valor para a próxima iteração
                 
                 saldo_devedor -= amortizacao
                 
-                # Usar taxa mensal para cálculo do valor presente, mas com dias corridos corretos
-                valor_presente = calcular_valor_presente(valor_balao_linha, taxas['mensal'], dias_corridos)
+                # Usar taxa mensal para cálculo do valor presente, como no original
+                valor_presente = calcular_valor_presente(_valor_balao_atual, taxas['mensal'], dias_corridos)
                 total_valor_presente += valor_presente
                 
                 baloes.append({
@@ -529,14 +521,14 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                     "Data_Vencimento": data_vencimento_balao.strftime('%d/%m/%Y'),
                     "Data_Pagamento": data_entrada.strftime('%d/%m/%Y'),
                     "Dias": dias_corridos,
-                    "Valor": valor_balao_linha, # Usa o valor ajustado para esta linha
+                    "Valor": _valor_balao_atual,
                     "Valor_Presente": valor_presente,
-                    "Desconto_Aplicado": valor_balao_linha - valor_presente
+                    "Desconto_Aplicado": _valor_balao_atual - valor_presente
                 })
         
         elif modalidade == "mensal + balão":
             intervalo_balao = 12 if tipo_balao == "anual" else 6
-            contador_baloes = 0 # Reiniciado para 0 para contar corretamente no loop
+            contador_baloes = 1 # Começa em 1, como no original
             
             for i in range(1, qtd_parcelas + 1):
                 data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
@@ -544,16 +536,15 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                 
                 # Cálculo da Parcela Mensal
                 juros_parcela = saldo_devedor * taxas['mensal']
-                amortizacao_parcela = _valor_parcela_calculo - juros_parcela
+                amortizacao_parcela = _valor_parcela_atual - juros_parcela
                 
-                valor_parcela_linha = _valor_parcela_calculo
                 if amortizacao_parcela > saldo_devedor:
                     amortizacao_parcela = saldo_devedor
-                    valor_parcela_linha = amortizacao_parcela + juros_parcela
+                    _valor_parcela_atual = amortizacao_parcela + juros_parcela # Modifica para a próxima iteração
                 
                 saldo_devedor -= amortizacao_parcela
                 
-                valor_presente_parcela = calcular_valor_presente(valor_parcela_linha, taxas['mensal'], dias_corridos)
+                valor_presente_parcela = calcular_valor_presente(_valor_parcela_atual, taxas['mensal'], dias_corridos)
                 total_valor_presente += valor_presente_parcela
                 
                 parcelas.append({
@@ -562,26 +553,26 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                     "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'),
                     "Data_Pagamento": data_entrada.strftime('%d/%m/%Y'),
                     "Dias": dias_corridos,
-                    "Valor": valor_parcela_linha,
+                    "Valor": _valor_parcela_atual,
                     "Valor_Presente": valor_presente_parcela,
-                    "Desconto_Aplicado": valor_parcela_linha - valor_presente_parcela
+                    "Desconto_Aplicado": _valor_parcela_atual - valor_presente_parcela
                 })
                 
                 # Verificação e Cálculo do Balão
-                if i % intervalo_balao == 0 and contador_baloes < qtd_baloes:
-                    contador_baloes += 1 # Incrementa antes de usar para corresponder ao "Balão 1", "Balão 2", etc.
-                    juros_balao = saldo_devedor * taxa_balao_aplicada # Usar a taxa apropriada para o balão
-                    amortizacao_balao = _valor_balao_calculo - juros_balao
+                # A condição original era `contador_baloes <= qtd_baloes`
+                # e o contador_baloes era incrementado APÓS a adição do balão.
+                if i % intervalo_balao == 0 and contador_baloes <= qtd_baloes:
+                    juros_balao = saldo_devedor * taxa_balao_aplicada # Usar taxa de balão anual/semestral para juros
+                    amortizacao_balao = _valor_balao_atual - juros_balao
                     
-                    valor_balao_linha = _valor_balao_calculo
                     if amortizacao_balao > saldo_devedor:
                         amortizacao_balao = saldo_devedor
-                        valor_balao_linha = amortizacao_balao + juros_balao
+                        _valor_balao_atual = amortizacao_balao + juros_balao # Modifica para a próxima iteração
                     
                     saldo_devedor -= amortizacao_balao
                     
                     # Cálculo do valor presente usando taxa mensal com dias corridos corretos
-                    valor_presente_balao = calcular_valor_presente(valor_balao_linha, taxas['mensal'], dias_corridos)
+                    valor_presente_balao = calcular_valor_presente(_valor_balao_atual, taxas['mensal'], dias_corridos)
                     total_valor_presente += valor_presente_balao
                     
                     baloes.append({
@@ -590,14 +581,15 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
                         "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'),
                         "Data_Pagamento": data_entrada.strftime('%d/%m/%Y'),
                         "Dias": dias_corridos,
-                        "Valor": valor_balao_linha,
+                        "Valor": _valor_balao_atual,
                         "Valor_Presente": valor_presente_balao,
-                        "Desconto_Aplicado": valor_balao_linha - valor_presente_balao
+                        "Desconto_Aplicado": _valor_balao_atual - valor_presente_balao
                     })
+                    contador_baloes += 1 # Incrementa após adicionar o balão, como no original
         
-        cronograma = sorted(parcelas + baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
+        cronograma = parcelas + baloes # Concatena, sem ordenar, como no original
         
-        # Verificação e ajuste de consistência
+        # Verificação e ajuste de consistência (mantido do original)
         if cronograma:
             soma_valor_presente = sum(item['Valor_Presente'] for item in cronograma)
             diferenca = valor_financiado - soma_valor_presente
@@ -621,7 +613,7 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao,
             "Data_Pagamento": "",
             "Dias": "",
             "Valor": total_valor,
-            "Valor_Presente": valor_financiado,  # Forçar o valor exato aqui
+            "Valor_Presente": total_valor_presente_final, # Usar o total calculado, como no original
             "Desconto_Aplicado": total_desconto
         })
     
@@ -941,37 +933,44 @@ def main():
             modo = determinar_modo_calculo(modalidade)
             
             # Recalcular valores de parcela/balão se forem 0 e o modo exigir
+            # É importante passar os valores originais de `valor_parcela` e `valor_balao`
+            # para `gerar_cronograma`, pois ele os modificará internamente.
             if modo == 1:  # Somente parcelas mensais
-                valor_parcela = calcular_parcela(valor_financiado, taxas['mensal'], qtd_parcelas)
-                valor_balao = 0
-                qtd_baloes = 0
+                valor_parcela_final = calcular_parcela(valor_financiado, taxas['mensal'], qtd_parcelas)
+                valor_balao_final = 0
+                qtd_baloes_final = 0
             elif modo == 2:  # Parcela + balão
                 if valor_parcela > 0: # Se o usuário informou a parcela, calcula o balão
                     saldo_parcelas_pv = calcular_valor_presente_total(valor_parcela, taxas['mensal'], qtd_parcelas)
                     saldo_baloes_necessario = round(max(valor_financiado - saldo_parcelas_pv, 0), 2)
-                    valor_balao = calcular_parcela(saldo_baloes_necessario, taxas[tipo_balao.lower()], qtd_baloes)
+                    valor_balao_final = calcular_parcela(saldo_baloes_necessario, taxas[tipo_balao.lower()], qtd_baloes)
+                    valor_parcela_final = valor_parcela # Mantém o valor de entrada
                 elif valor_balao > 0: # Se o usuário informou o balão, calcula a parcela
                     saldo_baloes_pv = calcular_valor_presente_total(valor_balao, taxas[tipo_balao.lower()], qtd_baloes)
                     saldo_parcelas_necessario = round(max(valor_financiado - saldo_baloes_pv, 0), 2)
-                    valor_parcela = calcular_parcela(saldo_parcelas_necessario, taxas['mensal'], qtd_parcelas)
+                    valor_parcela_final = calcular_parcela(saldo_parcelas_necessario, taxas['mensal'], qtd_parcelas)
+                    valor_balao_final = valor_balao # Mantém o valor de entrada
                 else: # Se ambos são 0, dividir igualmente (ou erro, dependendo da regra de negócio)
                     st.warning("Para modalidade 'mensal + balão', informe o valor da parcela ou do balão.")
                     return
+                qtd_baloes_final = qtd_baloes # Usa a quantidade de balões calculada/informada
             elif modo == 3:  # Só balão anual
-                valor_balao = calcular_parcela(valor_financiado, taxas['anual'], qtd_baloes)
-                valor_parcela = 0
-                qtd_parcelas = 0
+                valor_balao_final = calcular_parcela(valor_financiado, taxas['anual'], qtd_baloes)
+                valor_parcela_final = 0
+                qtd_parcelas_final = 0
+                qtd_baloes_final = qtd_baloes
             elif modo == 4:  # Só balão semestral
-                valor_balao = calcular_parcela(valor_financiado, taxas['semestral'], qtd_baloes)
-                valor_parcela = 0
-                qtd_parcelas = 0
+                valor_balao_final = calcular_parcela(valor_financiado, taxas['semestral'], qtd_baloes)
+                valor_parcela_final = 0
+                qtd_parcelas_final = 0
+                qtd_baloes_final = qtd_baloes
             
             cronograma = gerar_cronograma(
                 valor_financiado, 
-                valor_parcela, 
-                valor_balao,
-                qtd_parcelas, 
-                qtd_baloes, 
+                valor_parcela_final, # Passa o valor calculado/informado
+                valor_balao_final,   # Passa o valor calculado/informado
+                qtd_parcelas, # Passa a qtd_parcelas original
+                qtd_baloes_final, # Passa a qtd_baloes calculada/informada
                 modalidade, 
                 tipo_balao.lower() if tipo_balao else None,
                 data_entrada, 
@@ -991,9 +990,9 @@ def main():
             with col_res2:
                 # Exibir a taxa de juros que foi efetivamente utilizada no cálculo
                 st.metric("Taxa Mensal Utilizada", f"{taxa_mensal_para_calculo:.2f}%")
-                st.metric("Valor da Parcela", formatar_moeda(valor_parcela))
+                st.metric("Valor da Parcela", formatar_moeda(valor_parcela_final)) # Exibe o valor final da parcela
                 if modalidade != "mensal":
-                    st.metric("Valor do Balão", formatar_moeda(valor_balao))
+                    st.metric("Valor do Balão", formatar_moeda(valor_balao_final)) # Exibe o valor final do balão
             
             # Mostrar cronograma
             st.subheader("Cronograma de Pagamentos")
@@ -1019,7 +1018,7 @@ def main():
                         
             total = next(p for p in cronograma if p['Item'] == 'TOTAL')
             st.metric("Valor Total a Pagar", formatar_moeda(total['Valor']))
-            st.metric("Valor Presente Total (Financiado)", formatar_moeda(valor_financiado))
+            st.metric("Valor Presente Total (Financiado)", formatar_moeda(total['Valor_Presente'])) # Agora usa o total['Valor_Presente'] do cronograma
             
             # Verificação de consistência
             if abs(total['Valor_Presente'] - valor_financiado) > 0.01:
