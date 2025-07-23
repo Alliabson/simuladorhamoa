@@ -591,8 +591,10 @@ def gerar_pdf(cronograma, dados):
             pdf.cell(larguras[4], 10, txt=formatar_moeda(total['Valor_Presente'], simbolo=False), border=1, align='R')
             pdf.cell(larguras[5], 10, txt=formatar_moeda(total['Desconto_Aplicado'], simbolo=False), border=1, align='R')
         
-        # Retorna os bytes do PDF com a codificação correta
-        return BytesIO(pdf.output(dest='S').encode('latin-1'))
+        # ### LINHA CORRIGIDA ###
+        # Retorna os bytes do PDF diretamente, sem o .encode()
+        return BytesIO(pdf.output())
+    
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {str(e)}")
         return BytesIO()
