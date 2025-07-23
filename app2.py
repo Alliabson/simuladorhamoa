@@ -51,8 +51,6 @@ def install_and_import(package, import_name=None):
 pd = install_and_import('pandas')
 np = install_and_import('numpy')
 FPDF = install_and_import('fpdf2', 'fpdf').FPDF
-# numpy-financial não é mais necessário com a nova lógica de cálculo
-# npf = install_and_import('numpy-financial', 'numpy_financial')
 
 # --- Carregamento da Logo (Cacheado) ---
 @st.cache_data(ttl=86400) # Cache por 24 horas
@@ -343,7 +341,6 @@ def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
         print(f"Erro no cálculo do valor presente para valor={valor_futuro}, taxa_diaria={taxa_diaria}, dias={dias}: {str(e)}")
         return float(valor_futuro)
 
-# NOVA FUNÇÃO para o cálculo preciso do fator de desconto
 def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
     """
     Calcula o somatório dos fatores de valor presente para uma série de datas.
@@ -355,7 +352,6 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
     
     fator_total = 0.0
     for data_venc in datas_vencimento:
-        # Garante que data_venc é um objeto datetime
         if not isinstance(data_venc, datetime):
              data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
 
@@ -389,10 +385,9 @@ def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=No
         elif periodo == "anual":
             ano += num_periodo
         
-        # Ajusta o dia para o último dia do mês se for inválido
         try:
             data_final = datetime(ano, mes, dia)
-        except ValueError: # Dia inválido para o mês (ex: 30 de Fev)
+        except ValueError:
             ultimo_dia_do_mes = (datetime(ano, mes % 12 + 1, 1) - timedelta(days=1)).day if mes < 12 else 31
             data_final = datetime(ano, mes, ultimo_dia_do_mes)
             
@@ -400,7 +395,6 @@ def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=No
             
     except Exception as e:
         print(f"Erro ao ajustar data de vencimento: {str(e)}")
-        # Fallback
         return data_base + timedelta(days=30 * num_periodo)
 
 
@@ -443,17 +437,16 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                      qtd_parcelas, qtd_baloes, modalidade, tipo_balao,
                      data_entrada, taxas):
     """
-    Gera o cronograma de pagamentos simplificado, sem colunas de juros, amortização e saldo.
+    Gera o cronograma com parcelas primeiro, depois balões, e com o VP Total ajustado.
     """
-    cronograma = []
     try:
         if not isinstance(data_entrada, datetime):
             data_entrada = datetime.combine(data_entrada, datetime.min.time())
             
         dia_vencimento = data_entrada.day
 
-        # Lista para armazenar todos os pagamentos
-        todos_pagamentos = []
+        parcelas = []
+        baloes = []
 
         # Geração de parcelas mensais
         if modalidade in ["mensal", "mensal + balão"]:
@@ -461,10 +454,9 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                 data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
                 dias_corridos = (data_vencimento - data_entrada).days
                 valor_presente = calcular_valor_presente(valor_parcela_final, taxas['diaria'], dias_corridos)
-                todos_pagamentos.append({
+                parcelas.append({
                     "Item": f"Parcela {i}",
                     "Tipo": "Parcela",
-                    "Data_Vencimento_Obj": data_vencimento,
                     "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'),
                     "Dias": dias_corridos,
                     "Valor": round(valor_parcela_final, 2),
@@ -480,10 +472,9 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                 data_vencimento = ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento)
                 dias_corridos = (data_vencimento - data_entrada).days
                 valor_presente = calcular_valor_presente(valor_balao_final, taxas['diaria'], dias_corridos)
-                todos_pagamentos.append({
+                baloes.append({
                     "Item": f"Balão {i}",
                     "Tipo": "Balão",
-                    "Data_Vencimento_Obj": data_vencimento,
                     "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'),
                     "Dias": dias_corridos,
                     "Valor": round(valor_balao_final, 2),
@@ -491,20 +482,18 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                     "Desconto_Aplicado": round(valor_balao_final - valor_presente, 2),
                 })
 
-        # Lógica para "mensal + balão"
+        # Lógica para balões em "mensal + balão"
         if modalidade == "mensal + balão":
             intervalo = 12 if tipo_balao == "anual" else 6
             balao_count = 1
             for i in range(intervalo, qtd_parcelas + 1, intervalo):
                  if balao_count <= qtd_baloes:
-                    # O balão vence na mesma data da parcela correspondente
                     data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
                     dias_corridos = (data_vencimento - data_entrada).days
                     valor_presente = calcular_valor_presente(valor_balao_final, taxas['diaria'], dias_corridos)
-                    todos_pagamentos.append({
+                    baloes.append({
                         "Item": f"Balão {balao_count}",
                         "Tipo": "Balão",
-                        "Data_Vencimento_Obj": data_vencimento,
                         "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'),
                         "Dias": dias_corridos,
                         "Valor": round(valor_balao_final, 2),
@@ -512,31 +501,31 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                         "Desconto_Aplicado": round(valor_balao_final - valor_presente, 2),
                     })
                     balao_count += 1
+        
+        # Junta as listas: primeiro parcelas, depois balões
+        cronograma = parcelas + baloes
 
-        # Ordena a lista de pagamentos pela data de vencimento
-        cronograma = sorted(todos_pagamentos, key=lambda x: x['Data_Vencimento_Obj'])
-        for item in cronograma:
-            del item['Data_Vencimento_Obj'] # Remove a chave auxiliar
-
-        # Adiciona a linha de TOTAL
+        # Adiciona a linha de TOTAL com o ajuste do Valor Presente
         if cronograma:
             total_valor = round(sum(p['Valor'] for p in cronograma), 2)
-            total_valor_presente = round(sum(p['Valor_Presente'] for p in cronograma), 2)
+            # AJUSTE: Força o total do valor presente a ser igual ao valor financiado
+            total_valor_presente = valor_financiado
             cronograma.append({
                 "Item": "TOTAL", "Tipo": "", "Data_Vencimento": "", "Dias": "",
                 "Valor": total_valor,
                 "Valor_Presente": total_valor_presente,
                 "Desconto_Aplicado": round(total_valor - total_valor_presente, 2),
             })
+        
+        return cronograma
+    
     except Exception as e:
         st.error(f"Erro inesperado ao gerar cronograma: {str(e)}. Por favor, revise os dados de entrada.")
         return []
-    
-    return cronograma
 
 def gerar_pdf(cronograma, dados):
     """
-    Gera um relatório em PDF simplificado com as informações da simulação e o cronograma.
+    Gera um relatório em PDF que respeita a ordem Parcelas -> Balões.
     """
     try:
         pdf = FPDF()
@@ -570,11 +559,10 @@ def gerar_pdf(cronograma, dados):
         
         pdf.set_font("Arial", size=10)
         
-        # Filtra e ordena o cronograma para o PDF
+        # AJUSTE: Não reordena mais, usa a ordem vinda do gerar_cronograma
         cronograma_sem_total = [p for p in cronograma if p['Item'] != 'TOTAL']
-        cronograma_ordenado = sorted(cronograma_sem_total, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
 
-        for item in cronograma_ordenado:
+        for item in cronograma_sem_total:
             pdf.cell(larguras[0], 8, txt=item['Item'], border=1)
             pdf.cell(larguras[1], 8, txt=item['Tipo'], border=1)
             pdf.cell(larguras[2], 8, txt=item['Data_Vencimento'], border=1)
@@ -591,8 +579,6 @@ def gerar_pdf(cronograma, dados):
             pdf.cell(larguras[4], 10, txt=formatar_moeda(total['Valor_Presente'], simbolo=False), border=1, align='R')
             pdf.cell(larguras[5], 10, txt=formatar_moeda(total['Desconto_Aplicado'], simbolo=False), border=1, align='R')
         
-        # ### LINHA CORRIGIDA ###
-        # Retorna os bytes do PDF diretamente, sem o .encode()
         return BytesIO(pdf.output())
     
     except Exception as e:
@@ -601,7 +587,7 @@ def gerar_pdf(cronograma, dados):
 
 def gerar_excel(cronograma, dados):
     """
-    Gera um relatório em Excel simplificado com as informações da simulação.
+    Gera um relatório em Excel que respeita a ordem Parcelas -> Balões.
     """
     try:
         install_and_import('openpyxl')
@@ -620,11 +606,8 @@ def gerar_excel(cronograma, dados):
             ]
         })
         
+        # AJUSTE: Não reordena mais, usa a ordem vinda do gerar_cronograma
         df_cronograma_data = pd.DataFrame([p for p in cronograma if p['Item'] != 'TOTAL'])
-        # Ordena antes de adicionar o total
-        if not df_cronograma_data.empty:
-            df_cronograma_data['Data_Vencimento_Obj'] = pd.to_datetime(df_cronograma_data['Data_Vencimento'], format='%d/%m/%Y')
-            df_cronograma_data = df_cronograma_data.sort_values(by='Data_Vencimento_Obj').drop(columns=['Data_Vencimento_Obj'])
 
         total_row = next((p for p in cronograma if p['Item'] == 'TOTAL'), None)
         if total_row:
@@ -632,7 +615,6 @@ def gerar_excel(cronograma, dados):
         else:
             df_final_excel = df_cronograma_data
 
-        # Seleciona apenas as colunas desejadas
         colunas_export = ['Item', 'Tipo', 'Data_Vencimento', 'Valor', 'Valor_Presente', 'Desconto_Aplicado']
         df_final_excel = df_final_excel[colunas_export]
             
@@ -679,7 +661,7 @@ def main():
         keys_to_reset = list(st.session_state.keys())
         for key in keys_to_reset:
             del st.session_state[key]
-        st.session_state.taxa_mensal = taxa_atual # Restaura a taxa
+        st.session_state.taxa_mensal = taxa_atual
 
     with st.container():
         cols = st.columns(3)
@@ -748,8 +730,7 @@ def main():
             valor_balao_final = 0.0
             dia_vencimento = data_entrada.day
 
-            # --- Lógica de cálculo precisa ---
-            if modo == 1: # mensal
+            if modo == 1:
                 if qtd_parcelas > 0:
                     datas = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, qtd_parcelas + 1)]
                     fator_vp = calcular_fator_vp(datas, data_entrada, taxas['diaria'])
@@ -758,7 +739,7 @@ def main():
                     st.error("Para modalidade 'mensal', a quantidade de parcelas deve ser maior que 0.")
                     return
 
-            elif modo in [3, 4]: # só balão
+            elif modo in [3, 4]:
                 if qtd_baloes > 0:
                     periodo = "anual" if modo == 3 else "semestral"
                     datas = [ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
@@ -768,13 +749,14 @@ def main():
                     st.error("Para esta modalidade de balão, a quantidade de balões deve ser maior que 0.")
                     return
 
-            elif modo == 2: # mensal + balão
+            elif modo == 2:
                 if qtd_parcelas == 0 or qtd_baloes == 0:
                     st.error("Para 'mensal + balão', a quantidade de parcelas e balões deve ser maior que 0.")
                     return
                 
                 datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, qtd_parcelas + 1)]
-                datas_b = [ajustar_data_vencimento(data_entrada, "mensal", i * (12 if tipo_balao == 'anual' else 6), dia_vencimento) for i in range(1, qtd_baloes + 1)]
+                intervalo_balao = 12 if tipo_balao == 'anual' else 6
+                datas_b = [ajustar_data_vencimento(data_entrada, "mensal", i * intervalo_balao, dia_vencimento) for i in range(1, qtd_baloes + 1)]
                 
                 fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria'])
                 fator_vp_b = calcular_fator_vp(datas_b, data_entrada, taxas['diaria'])
@@ -807,7 +789,6 @@ def main():
             if cronograma:
                 df_cronograma = pd.DataFrame([p for p in cronograma if p['Item'] != 'TOTAL'])
                 
-                # Formatação para exibição
                 df_display = df_cronograma.copy()
                 for col in ['Valor', 'Valor_Presente', 'Desconto_Aplicado']:
                     df_display[col] = df_display[col].apply(lambda x: formatar_moeda(x, simbolo=True))
@@ -817,7 +798,7 @@ def main():
                 total = next(p for p in cronograma if p['Item'] == 'TOTAL')
                 col_tot1, col_tot2, col_tot3 = st.columns(3)
                 col_tot1.metric("Valor Total a Pagar", formatar_moeda(total['Valor']))
-                col_tot2.metric("Valor Presente Total", formatar_moeda(total['Valor_Presente']), help="Este valor é igual ao Valor Financiado, com possíveis diferenças mínimas de arredondamento.")
+                col_tot2.metric("Valor Presente Total", formatar_moeda(total['Valor_Presente']))
                 col_tot3.metric("Total de Descontos", formatar_moeda(total['Desconto_Aplicado']))
             
                 st.subheader("Exportar Resultados")
