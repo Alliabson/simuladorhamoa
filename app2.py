@@ -747,7 +747,6 @@ def main():
 
             cronograma = gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final, qtd_parcelas, qtd_baloes, modalidade, tipo_balao, data_entrada, taxas, valor_ultima_parcela=valor_ultima_parcela_ajustada)
             
-            # --- SEÇÃO DE RESULTADOS ATUALIZADA ---
             st.subheader("Resultados da Simulação")
             col_res1, col_res2, col_res3, col_res4 = st.columns(4)
             
