@@ -600,7 +600,7 @@ def main():
                 qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: {qtd_baloes}")
             
-            valor_parcela = st.number_input("Valor da Parcela (R$)", help="Para 'mensal + balão', se este valor for informado, o sistema calculará o balão.", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
+            valor_parcela = st.number_input("Valor da Parcela (R$) - No plano mensal, só balão anual e só balão semestral deixe 0, No plano mensal+balão digite o valor)", help="Para 'mensal + balão', se este valor for informado, o sistema calculará o balão.", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
             
             valor_balao = 0.0
             if "balão" in modalidade:
