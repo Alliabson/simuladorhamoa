@@ -12,7 +12,8 @@ import re
 # --- Configuração de Locale ---
 def configure_locale():
     """
-    Configura o locale para português do Brasil.
+    Configura o locale para português do Brasil, tentando várias opções
+    para garantir compatibilidade em diferentes ambientes.
     """
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
@@ -20,7 +21,14 @@ def configure_locale():
         try:
             locale.setlocale(locale.LC_ALL, 'pt_BR')
         except locale.Error:
-            st.warning("Configuração de locale 'pt_BR' não disponível.")
+            try:
+                locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+            except locale.Error:
+                try:
+                    locale.setlocale(locale.LC_ALL, '')
+                except locale.Error:
+                    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+                    st.warning("Configuração de locale específica não disponível. Usando padrão internacional.")
 
 configure_locale()
 
