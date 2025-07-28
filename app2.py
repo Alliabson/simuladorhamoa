@@ -459,7 +459,7 @@ def main():
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
                     meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, int(st.session_state.get("qtd_parcelas", 180)) + 1)), key="meses_baloes")
                 elif agendamento_baloes == "A partir do 1º Vencimento":
-                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=int(st.session_state.get("qtd_parcelas", 180)), value=12, step=1, key="mes_primeiro_balao")
+                    mes_primeiro_balao = st.number_input("***Escolha/digite daqui a quantos meses quer que vença o balão***", min_value=1, max_value=int(st.session_state.get("qtd_parcelas", 180)), value=12, step=1, key="mes_primeiro_balao")
             elif "anual" in modalidade: tipo_balao = "anual"
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
