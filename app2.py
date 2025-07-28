@@ -252,6 +252,7 @@ def set_theme():
     </style>
     """, unsafe_allow_html=True)
     
+
 # --- Funções de Cálculo Financeiro ---
 
 def formatar_moeda(valor, simbolo=True):
@@ -425,7 +426,6 @@ def main():
     if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = 0.89
     
     def reset_form(): 
-        # Mantém a taxa de juros atual, se o usuário a alterou
         taxa_atual = st.session_state.taxa_mensal
         st.session_state.clear()
         st.session_state.taxa_mensal = taxa_atual
@@ -440,31 +440,30 @@ def main():
             valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total")
             entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada")
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
-            
-            # AJUSTE: Campo de taxa de juros agora é editável
-            taxa_mensal = st.number_input(
-                "Taxa de Juros Mensal (%)", 
-                min_value=0.00,
-                value=st.session_state.taxa_mensal, 
-                step=0.01, 
-                format="%.2f", 
-                key="taxa_mensal" # Vincula o campo ao estado da sessão
-            )
-
+            taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.01, format="%.2f", key="taxa_mensal")
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
             if modalidade == "mensal + balão": 
                 tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao")
                 agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], key="agendamento_baloes")
+                
+                # Pre-calcula o maximo de parcelas de forma segura
+                max_parcelas_seguro = int(st.session_state.get("qtd_parcelas", 1))
+                if max_parcelas_seguro <= 0: max_parcelas_seguro = 1 # Garante que o range não seja vazio
+                
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
-                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, int(st.session_state.get("qtd_parcelas", 180)) + 1)), key="meses_baloes")
+                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), key="meses_baloes")
                 elif agendamento_baloes == "A partir do 1º Vencimento":
-                    mes_primeiro_balao = st.number_input("***Escolha/digite daqui a quantos meses quer que vença o balão***", min_value=1, max_value=int(st.session_state.get("qtd_parcelas", 180)), value=12, step=1, key="mes_primeiro_balao")
+                    # AJUSTE: O valor padrão e máximo agora são seguros
+                    valor_padrao_mes = min(12, max_parcelas_seguro)
+                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=valor_padrao_mes, step=1, key="mes_primeiro_balao")
+            
             elif "anual" in modalidade: tipo_balao = "anual"
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
         with col2:
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, max_value=180, step=1, key="qtd_parcelas")
+            # AJUSTE: Limite de parcelas removido
+            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas")
             qtd_baloes = 0
             if "balão" in modalidade:
                 if agendamento_baloes == "Personalizado (Mês a Mês)": qtd_baloes = len(meses_baloes)
@@ -475,14 +474,16 @@ def main():
             if "balão" in modalidade:
                 valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
         
+        # AJUSTE: Botões movidos para dentro do formulário
         col_b1, col_b2, _ = st.columns([1, 1, 4])
-        submitted = col_b1.form_submit_button("Calcular"); col_b2.form_submit_button("Reiniciar", on_click=reset_form)
+        with col_b1:
+            submitted = st.form_submit_button("Calcular")
+        with col_b2:
+            st.form_submit_button("Reiniciar", on_click=reset_form)
     
     if submitted:
         try:
-            # AJUSTE: A taxa para cálculo agora vem do campo editável, com a regra de 36 meses
             taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
-
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
