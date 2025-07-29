@@ -11,27 +11,16 @@ import re
 
 # --- Configuração de Locale ---
 def configure_locale():
-    """
-    Configura o locale para português do Brasil, tentando várias opções
-    para garantir compatibilidade em diferentes ambientes.
-    """
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     except locale.Error:
         try:
             locale.setlocale(locale.LC_ALL, 'pt_BR')
         except locale.Error:
-            try:
-                locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
-            except locale.Error:
-                try:
-                    locale.setlocale(locale.LC_ALL, '')
-                except locale.Error:
-                    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
-                    st.warning("Configuração de locale específica não disponível. Usando padrão internacional.")
+            st.warning("Configuração de locale pt_BR não disponível.")
+            locale.setlocale(locale.LC_ALL, '')
 
 configure_locale()
-
 
 # --- Instalação e Importação de Dependências ---
 def install_and_import(package, import_name=None):
@@ -62,20 +51,11 @@ def load_logo():
 # --- Carregamento dos Dados das Unidades (Cacheado e Robusto) ---
 @st.cache_data(ttl=3600)
 def load_property_data():
-    """
-    Carrega os dados das unidades do arquivo Excel no GitHub de forma robusta.
-    Retorna um DataFrame vazio em caso de erro.
-    """
     try:
         url = 'https://raw.githubusercontent.com/Alliabson/simuladorhamoa/main/Simulador.xlsx'
         df = pd.read_excel(url, dtype={'Quadra': str, 'Lote': str})
-        
-        # MELHORIA: Remove espaços em branco dos nomes das colunas
         df.columns = df.columns.str.strip()
-        
-        # MELHORIA: Remove linhas onde colunas essenciais estão vazias
         df.dropna(subset=['Quadra', 'Lote'], inplace=True)
-        
         return df
     except Exception as e:
         st.error(f"Falha ao carregar a lista de unidades do GitHub: {e}")
@@ -86,9 +66,7 @@ st.set_page_config(layout="wide")
 
 def set_theme():
     """
-    Aplica estilos CSS personalizados para um tema escuro
-    e aprimora a aparência dos componentes do Streamlit.
-    Inclui estilos para botões com efeitos de hover e clique.
+    Aplica estilos CSS personalizados.
     """
     st.markdown("""
     <style>
@@ -97,46 +75,39 @@ def set_theme():
             background-color: #1E1E1E;
         }
         
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background-color: #252526;
-        }
-        
         /* Títulos */
         h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
             color: #FFFFFF;
         }
         
-        /* Texto geral */
-        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label {
+        /* Texto geral e labels */
+        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label, .stTextInput label {
             color: #E0E0E0;
         }
         
-        /* Inputs */
+        /* Inputs ativos (Quadra e Lote) */
         .stTextInput input, .stNumberInput input, .stSelectbox select {
             background-color: #333333;
             color: #FFFFFF;
             border-color: #555555;
         }
         
-        /* Botões padrão (não os customizados abaixo) */
-        .stButton button {
-            background-color: #0056b3;
-            color: white;
-            border: none;
-            border-radius: 4px;
+        /* **CORREÇÃO DE ESTILO AQUI**
+        Define um estilo destacado para o campo de Metragem quando desabilitado.
+        */
+        .stTextInput input:disabled {
+            background-color: #FFFFFF !important; /* Fundo branco */
+            color: #000000 !important;           /* Fonte preta */
+            font-weight: bold;                   /* Texto em negrito para ênfase */
+            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
         }
-        
-        .stButton button:hover {
-            background-color: #003d82;
-        }
-        
+
         /* Cards/metricas */
         .stMetric {
             background-color: #252526;
             border-radius: 8px;
             padding: 15px;
-            border-left: 4px solid #4D6BFE; /* Cor da borda alterada para combinar com os botões */
+            border-left: 4px solid #4D6BFE;
         }
         
         .stMetric label {
@@ -149,128 +120,43 @@ def set_theme():
         }
         
         /* Dataframe */
-        .dataframe {
-            background-color: #252526 !important;
-            color: #E0E0E0 !important;
-        }
-        
         .dataframe th {
-            background-color: #4D6BFE !important; /* Cor do cabeçalho alterada */
+            background-color: #4D6BFE !important;
             color: white !important;
         }
-        
-        .dataframe tr:nth-child(even) {
-            background-color: #333333 !important;
-        }
-        
-        .dataframe tr:hover {
-            background-color: #444444 !important;
-        }
 
-        /* ===== LAYOUT ===== */
-        /* Container principal */
-        .main .block-container {
-            padding: 2rem 1rem !important;
-        }
-
-        /* Colunas e alinhamento */
-        [data-testid="column"] {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            padding: 0 !important;
-        }
-
-        /* Espaçamento entre botões */
-        .stButton:first-of-type {
-            margin-right: 8px !important;
-        }
-
-        /* ===== FLICKERING FIX ===== */
-        [data-testid="stDataFrame-container"] {
-            will-change: transform !important;
-            contain: strict !important;
-            min-height: 400px !important;
-            transform: translate3d(0, 0, 0) !important;
-            backface-visibility: hidden !important;
-            perspective: 1000px !important;
-        }
-
-        .stDataFrame-fullscreen {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            z-index: 9999 !important;
-            background-color: #0E1117 !important;
-            padding: 2rem !important;
-            overflow: auto !important;
-        }
-
-        /* Títulos específicos para cor branca */
-        h1, h2, h3, h4, h5, h6, 
-        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
-        /* Textos de input/labels */
-        .stTextInput label, .stNumberInput label, 
-        .stSelectbox label, .stDateInput label,
-        /* Subtítulos das seções */
-        .stSubheader,
-        /* Botões de exportação (labels) */
-        .stDownloadButton label {
-            color: #FFFFFF !important;
-        }
-        
-        /* Labels específicos que não são capturados pelas regras acima */
-        div[data-testid="stForm"] label,
-        div[data-testid="stVerticalBlock"] > div > div > div > div > label {
-            color: #FFFFFF !important;
-        }
-
-        /* BOTÕES PRINCIPAIS - ESTADO NORMAL (Calcular/Reiniciar/Exportar) */
+        /* Botões Principais */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
         div[data-testid="stForm"] button[kind="secondary"],
         .stDownloadButton button {
-            background-color: #4D6BFE !important; /* Azul vibrante */
+            background-color: #4D6BFE !important;
             color: white !important;
             border: none !important;
-            border-radius: 12px !important; /* Bordas super arredondadas */
+            border-radius: 12px !important;
             padding: 10px 24px !important;
             font-weight: 600 !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
-        /* EFEITO HOVER - VERMELHO INTENSO */
+        /* Efeito Hover nos Botões */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
         div[data-testid="stForm"] button[kind="secondary"]:hover,
         .stDownloadButton button:hover {
-            background-color: #FF4D4D !important; /* Vermelho vibrante */
+            background-color: #FF4D4D !important;
             transform: translateY(-2px) !important;
-            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
 
-        /* EFEITO CLIQUE */
+        /* Efeito Clique nos Botões */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active,
         div[data-testid="stForm"] button[kind="secondary"]:active,
         .stDownloadButton button:active {
             transform: translateY(0) !important;
-            background-color: #E04444 !important; /* Vermelho mais escuro */
-        }
-
-        /* TEXTO DOS BOTÕES */
-        div[data-testid="stForm"] button > div > p,
-        .stDownloadButton button > div > p {
-            color: white !important;
-            font-size: 14px !important;
-            margin: 0 !important;
+            background-color: #E04444 !important;
         }
     </style>
     """, unsafe_allow_html=True)
-    
 
-# --- Funções de Cálculo Financeiro ---
-
+# --- Funções de Cálculo e Geração de Documentos (sem alterações) ---
 def formatar_moeda(valor, simbolo=True):
     try:
         if isinstance(valor, str) and 'R$' in valor:
@@ -409,7 +295,6 @@ def gerar_excel(cronograma, dados):
     except Exception as e:
         st.error(f"Erro ao gerar Excel: {str(e)}"); return BytesIO()
 
-
 # --- Função Principal do Aplicativo Streamlit ---
 def main():
     set_theme()
@@ -428,17 +313,14 @@ def main():
         st.session_state.clear()
         st.session_state.taxa_mensal = 0.89
 
-    # --- INÍCIO DA LÓGICA DE SELEÇÃO DE UNIDADE ---
+    # --- LÓGICA DE SELEÇÃO DE UNIDADE ---
     df_unidades = load_property_data()
 
     if df_unidades.empty and 'quadra' not in st.session_state:
-        st.warning("A lista de unidades não pôde ser carregada. Verifique o arquivo de origem ou a conexão com a internet.")
+        st.warning("A lista de unidades não pôde ser carregada. Verifique o arquivo de origem ou a conexão.")
     
-    # **CORREÇÃO PRINCIPAL AQUI**
-    # Define o nome correto da coluna para a metragem
     COLUNA_METRAGEM = 'Qtde'
 
-    # Verifica se a coluna de metragem existe, mas somente se o dataframe não estiver vazio
     if not df_unidades.empty and COLUNA_METRAGEM not in df_unidades.columns:
         st.error(f"Erro de Configuração: A coluna '{COLUNA_METRAGEM}' não foi encontrada na planilha Excel.")
         st.info(f"As colunas encontradas foram: {df_unidades.columns.tolist()}")
@@ -458,15 +340,12 @@ def main():
         if quadra_selecionada and lote_selecionado and not df_unidades.empty:
             metragem_info = df_unidades[(df_unidades['Quadra'] == quadra_selecionada) & (df_unidades['Lote'] == lote_selecionado)]
             if not metragem_info.empty:
-                # **CORREÇÃO** Usa a variável com o nome correto da coluna
                 metragem_valor = str(metragem_info[COLUNA_METRAGEM].iloc[0])
         
-        # O rótulo do campo continua o mesmo para exibição ao usuário
         cols[2].text_input("Metragem (m²)", value=metragem_valor, key="metragem", disabled=True)
 
     # --- Formulário de Simulação ---
     with st.form("simulador_form"):
-        # ... (Restante do formulário sem alterações)
         col1, col2 = st.columns(2)
         with col1:
             valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total")
@@ -485,7 +364,7 @@ def main():
             if "balão" in modalidade:
                 qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: {qtd_baloes}")
-            valor_parcela = st.number_input("Valor da Parcela (R$)", help="Para 'mensal + balão', se informado, o sistema calculará o balão. Deixe 0 nos outros modos.", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
+            valor_parcela = st.number_input("Valor da Parcela (R$)", help="Para 'mensal + balão', se informado, o sistema calculará o balão.", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
             valor_balao = 0.0
             if "balão" in modalidade:
                 valor_balao = st.number_input("Valor do Balão (R$)", help="Para 'mensal + balão', se informado, o sistema calculará a parcela.", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
@@ -496,11 +375,11 @@ def main():
     
     # --- Lógica de Cálculo e Exibição de Resultados ---
     if submitted:
-        # ... (Restante do código de cálculo e exibição de resultados sem alterações)
         try:
             taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36) else 0.0
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             valor_financiado = round(max(valor_total - entrada, 0), 2)
+            # ... (Restante do código de cálculo e exibição de resultados mantido igual)
             taxas = calcular_taxas(taxa_mensal_para_calculo)
             modo = determinar_modo_calculo(modalidade)
             valor_parcela_final, valor_balao_final = 0.0, 0.0
