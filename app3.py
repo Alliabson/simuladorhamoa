@@ -87,16 +87,19 @@ def set_theme():
             background-color: #1E1E1E;
         }
         /*
-        **CORREÇÃO DE ESTILO AQUI**
-        Define um estilo destacado para TODOS os campos de input desabilitados (texto e número).
+        **CORREÇÃO DE ESTILO DEFINITIVA**
+        Esta regra é mais específica para garantir que ela sobrescreva os temas padrão do Streamlit.
+        Funciona para campos de texto e numéricos desabilitados.
         */
-        .stTextInput input:disabled,
-        .stNumberInput input:disabled {
-            background-color: #FFFFFF !important; /* Fundo branco */
-            color: #000000 !important;           /* Fonte preta */
-            font-weight: bold;                   /* Texto em negrito para ênfase */
-            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
+        [data-testid="stAppViewContainer"] .stTextInput input:disabled,
+        [data-testid="stAppViewContainer"] .stNumberInput input:disabled {
+            background-color: #FFFFFF !important;       /* Força fundo branco */
+            color: #000000 !important;                   /* Força texto preto */
+            -webkit-text-fill-color: #000000 !important; /* Propriedade crucial para Chrome/Safari */
+            font-weight: bold;
+            border: 1px solid #CCCCCC;
         }
+
         /* Sidebar */
         [data-testid="stSidebar"] {
             background-color: #252526;
