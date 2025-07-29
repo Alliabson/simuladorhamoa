@@ -11,14 +11,24 @@ import re
 
 # --- Configuração de Locale ---
 def configure_locale():
+    """
+    Configura o locale para português do Brasil, tentando várias opções
+    para garantir compatibilidade em diferentes ambientes.
+    """
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     except locale.Error:
         try:
             locale.setlocale(locale.LC_ALL, 'pt_BR')
         except locale.Error:
-            st.warning("Configuração de locale pt_BR não disponível.")
-            locale.setlocale(locale.LC_ALL, '')
+            try:
+                locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+            except locale.Error:
+                try:
+                    locale.setlocale(locale.LC_ALL, '')
+                except locale.Error:
+                    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+                    st.warning("Configuração de locale específica não disponível. Usando padrão internacional.")
 
 configure_locale()
 
@@ -66,7 +76,9 @@ st.set_page_config(layout="wide")
 
 def set_theme():
     """
-    Aplica estilos CSS personalizados.
+    Aplica estilos CSS personalizados para um tema escuro
+    e aprimora a aparência dos componentes do Streamlit.
+    Inclui estilos para botões com efeitos de hover e clique.
     """
     st.markdown("""
     <style>
@@ -75,39 +87,46 @@ def set_theme():
             background-color: #1E1E1E;
         }
         
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #252526;
+        }
+        
         /* Títulos */
         h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
             color: #FFFFFF;
         }
         
-        /* Texto geral e labels */
-        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label, .stTextInput label {
+        /* Texto geral */
+        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label {
             color: #E0E0E0;
         }
         
-        /* Inputs ativos (Quadra e Lote) */
+        /* Inputs */
         .stTextInput input, .stNumberInput input, .stSelectbox select {
             background-color: #333333;
             color: #FFFFFF;
             border-color: #555555;
         }
         
-        /* **CORREÇÃO DE ESTILO AQUI**
-        Define um estilo destacado para o campo de Metragem quando desabilitado.
-        */
-        .stTextInput input:disabled {
-            background-color: #FFFFFF !important; /* Fundo branco */
-            color: #000000 !important;           /* Fonte preta */
-            font-weight: bold;                   /* Texto em negrito para ênfase */
-            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
+        /* Botões padrão (não os customizados abaixo) */
+        .stButton button {
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 4px;
         }
-
+        
+        .stButton button:hover {
+            background-color: #003d82;
+        }
+        
         /* Cards/metricas */
         .stMetric {
             background-color: #252526;
             border-radius: 8px;
             padding: 15px;
-            border-left: 4px solid #4D6BFE;
+            border-left: 4px solid #4D6BFE; /* Cor da borda alterada para combinar com os botões */
         }
         
         .stMetric label {
@@ -120,41 +139,135 @@ def set_theme():
         }
         
         /* Dataframe */
+        .dataframe {
+            background-color: #252526 !important;
+            color: #E0E0E0 !important;
+        }
+        
         .dataframe th {
-            background-color: #4D6BFE !important;
+            background-color: #4D6BFE !important; /* Cor do cabeçalho alterada */
             color: white !important;
         }
+        
+        .dataframe tr:nth-child(even) {
+            background-color: #333333 !important;
+        }
+        
+        .dataframe tr:hover {
+            background-color: #444444 !important;
+        }
 
-        /* Botões Principais */
+        /* ===== LAYOUT ===== */
+        /* Container principal */
+        .main .block-container {
+            padding: 2rem 1rem !important;
+        }
+
+        /* Colunas e alinhamento */
+        [data-testid="column"] {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 0 !important;
+        }
+
+        /* Espaçamento entre botões */
+        .stButton:first-of-type {
+            margin-right: 8px !important;
+        }
+
+        /* ===== FLICKERING FIX ===== */
+        [data-testid="stDataFrame-container"] {
+            will-change: transform !important;
+            contain: strict !important;
+            min-height: 400px !important;
+            transform: translate3d(0, 0, 0) !important;
+            backface-visibility: hidden !important;
+            perspective: 1000px !important;
+        }
+
+        .stDataFrame-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            z-index: 9999 !important;
+            background-color: #0E1117 !important;
+            padding: 2rem !important;
+            overflow: auto !important;
+        }
+
+        /* Títulos específicos para cor branca */
+        h1, h2, h3, h4, h5, h6, 
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+        /* Textos de input/labels */
+        .stTextInput label, .stNumberInput label, 
+        .stSelectbox label, .stDateInput label,
+        /* Subtítulos das seções */
+        .stSubheader,
+        /* Botões de exportação (labels) */
+        .stDownloadButton label {
+            color: #FFFFFF !important;
+        }
+        
+        /* Labels específicos que não são capturados pelas regras acima */
+        div[data-testid="stForm"] label,
+        div[data-testid="stVerticalBlock"] > div > div > div > div > label {
+            color: #FFFFFF !important;
+        }
+
+        /* BOTÕES PRINCIPAIS - ESTADO NORMAL (Calcular/Reiniciar/Exportar) */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
         div[data-testid="stForm"] button[kind="secondary"],
         .stDownloadButton button {
-            background-color: #4D6BFE !important;
+            background-color: #4D6BFE !important; /* Azul vibrante */
             color: white !important;
             border: none !important;
-            border-radius: 12px !important;
+            border-radius: 12px !important; /* Bordas super arredondadas */
             padding: 10px 24px !important;
             font-weight: 600 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
-        /* Efeito Hover nos Botões */
+        /* EFEITO HOVER - VERMELHO INTENSO */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
         div[data-testid="stForm"] button[kind="secondary"]:hover,
         .stDownloadButton button:hover {
-            background-color: #FF4D4D !important;
+            background-color: #FF4D4D !important; /* Vermelho vibrante */
             transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
 
-        /* Efeito Clique nos Botões */
+        /* **CORREÇÃO DE ESTILO AQUI**
+        Define um estilo destacado para o campo de Metragem quando desabilitado.
+        */
+        .stTextInput input:disabled {
+            background-color: #FFFFFF !important; /* Fundo branco */
+            color: #000000 !important;           /* Fonte preta */
+            font-weight: bold;                   /* Texto em negrito para ênfase */
+            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
+        }
+		
+        /* EFEITO CLIQUE */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active,
         div[data-testid="stForm"] button[kind="secondary"]:active,
         .stDownloadButton button:active {
             transform: translateY(0) !important;
-            background-color: #E04444 !important;
+            background-color: #E04444 !important; /* Vermelho mais escuro */
+        }
+
+        /* TEXTO DOS BOTÕES */
+        div[data-testid="stForm"] button > div > p,
+        .stDownloadButton button > div > p {
+            color: white !important;
+            font-size: 14px !important;
+            margin: 0 !important;
         }
     </style>
     """, unsafe_allow_html=True)
+
 
 # --- Funções de Cálculo e Geração de Documentos (sem alterações) ---
 def formatar_moeda(valor, simbolo=True):
