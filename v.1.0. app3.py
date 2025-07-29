@@ -1,4 +1,3 @@
-
 import streamlit as st
 from datetime import datetime, timedelta
 from PIL import Image
@@ -62,12 +61,30 @@ def load_logo():
     do script ou ter seu caminho completo fornecido.
     """
     try:
+        # Tente carregar a partir de um caminho relativo.
+        # Se for implantado no Streamlit Cloud, adicione o arquivo ao seu repositório.
         logo = Image.open("JMD HAMOA HORIZONTAL - BRANCO.png")
         logo.thumbnail((300, 300)) # Redimensiona a logo para um tamanho razoável
         return logo
     except Exception as e:
         st.warning(f"Não foi possível carregar a logo: {str(e)}. Verifique se 'JMD HAMOA HORIZONTAL - BRANCO.png' está no diretório correto.")
         return None
+
+# --- Carregamento dos Dados das Unidades (Cacheado) ---
+@st.cache_data(ttl=3600) # Cache por 1 hora
+def load_property_data():
+    """
+    Carrega os dados das unidades do arquivo Excel no GitHub.
+    Retorna um DataFrame vazio em caso de erro.
+    """
+    try:
+        # URL direta para o arquivo raw no GitHub
+        url = 'https://raw.githubusercontent.com/Alliabson/simuladorhamoa/main/Simulador.xlsx'
+        df = pd.read_excel(url, dtype={'Quadra': str, 'Lote': str})
+        return df
+    except Exception as e:
+        st.error(f"Falha ao carregar a lista de unidades do GitHub: {e}")
+        return pd.DataFrame({'Quadra': [], 'Lote': [], 'Metragem (m²)': []})
 
 # --- Configuração da Página Streamlit e Tema ---
 st.set_page_config(layout="wide")
@@ -107,6 +124,12 @@ def set_theme():
             border-color: #555555;
         }
         
+        /* Input desabilitado (para metragem) */
+        .stTextInput input:disabled {
+            background-color: #404040;
+            color: #A0A0A0;
+        }
+
         /* Botões padrão (não os customizados abaixo) */
         .stButton button {
             background-color: #0056b3;
@@ -318,7 +341,7 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
     fator_total = 0.0
     for data_venc in datas_vencimento:
         if not isinstance(data_venc, datetime):
-             data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
+            data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
 
         dias = (data_venc - data_inicio).days
         if dias > 0:
@@ -421,7 +444,7 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             intervalo = 12 if tipo_balao == "anual" else 6
             balao_count = 1
             for i in range(intervalo, qtd_parcelas + 1, intervalo):
-                 if balao_count <= qtd_baloes:
+                if balao_count <= qtd_baloes:
                     valor_corrente = valor_primeiro_balao if (balao_count == 1 and valor_primeiro_balao is not None) else valor_balao_final
                     data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
                     dias_corridos = (data_vencimento - data_entrada).days
@@ -566,15 +589,55 @@ def main():
     if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = 0.89
     
     def reset_form():
-        st.session_state.clear()
+        # Lista de chaves a serem preservadas
+        keys_to_keep = ['taxa_mensal']
+        # Itera sobre as chaves do session_state e remove as que não estão na lista
+        for key in list(st.session_state.keys()):
+            if key not in keys_to_keep:
+                del st.session_state[key]
+        # Restaura a taxa mensal se ela foi removida acidentalmente
         st.session_state.taxa_mensal = 0.89
+
+
+    # --- INÍCIO DA LÓGICA DE SELEÇÃO DE UNIDADE ---
+    df_unidades = load_property_data()
 
     with st.container():
         cols = st.columns(3)
-        quadra = cols[0].text_input("Quadra", key="quadra")
-        lote = cols[1].text_input("Lote", key="lote")
-        metragem = cols[2].text_input("Metragem (m²)", key="metragem")
-    
+        
+        # Widget para Quadra
+        # Adiciona uma opção vazia no início para servir como placeholder
+        quadras_disponiveis = [""] + sorted(df_unidades['Quadra'].unique().tolist())
+        quadra_selecionada = cols[0].selectbox(
+            "Quadra", options=quadras_disponiveis, key="quadra", help="Selecione a quadra desejada."
+        )
+
+        # Widget para Lote (dependente da Quadra)
+        if quadra_selecionada:
+            # Filtra os lotes disponíveis para a quadra selecionada
+            lotes_disponiveis = [""] + sorted(df_unidades[df_unidades['Quadra'] == quadra_selecionada]['Lote'].unique().tolist())
+        else:
+            lotes_disponiveis = [""] # Se nenhuma quadra for selecionada, a lista fica vazia
+        lote_selecionado = cols[1].selectbox(
+            "Lote", options=lotes_disponiveis, key="lote", help="Selecione o lote após escolher uma quadra."
+        )
+
+        # Campo Metragem (preenchido automaticamente e desabilitado)
+        metragem_valor = ""
+        if quadra_selecionada and lote_selecionado:
+            metragem_info = df_unidades[
+                (df_unidades['Quadra'] == quadra_selecionada) &
+                (df_unidades['Lote'] == lote_selecionado)
+            ]
+            if not metragem_info.empty:
+                # Pega o valor da coluna 'Metragem (m²)'
+                metragem_valor = str(metragem_info['Metragem (m²)'].iloc[0])
+
+        # O valor é passado para o text_input, que é desabilitado
+        cols[2].text_input("Metragem (m²)", value=metragem_valor, key="metragem", disabled=True)
+    # --- FIM DA LÓGICA DE SELEÇÃO DE UNIDADE ---
+
+
     with st.form("simulador_form"):
         col1, col2 = st.columns(2)
         
@@ -715,7 +778,13 @@ def main():
                 col_tot3.metric("Total de Descontos", formatar_moeda(total['Desconto_Aplicado']))
             
                 st.subheader("Exportar Resultados")
-                export_data = {'valor_total': valor_total, 'entrada': entrada, 'taxa_mensal': taxa_mensal_para_calculo, 'valor_financiado': valor_financiado, 'quadra': quadra, 'lote': lote, 'metragem': metragem}
+                # Busca os dados de quadra/lote/metragem do session_state
+                export_data = {
+                    'valor_total': valor_total, 'entrada': entrada, 
+                    'taxa_mensal': taxa_mensal_para_calculo, 'valor_financiado': valor_financiado, 
+                    'quadra': st.session_state.quadra, 'lote': st.session_state.lote, 
+                    'metragem': st.session_state.metragem
+                }
                 
                 col_exp1, col_exp2 = st.columns(2)
                 pdf_file = gerar_pdf(cronograma, export_data)
