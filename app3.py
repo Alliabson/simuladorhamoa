@@ -86,7 +86,17 @@ def set_theme():
         .stApp {
             background-color: #1E1E1E;
         }
-        
+        /*
+        **CORREÇÃO DE ESTILO AQUI**
+        Define um estilo destacado para TODOS os campos de input desabilitados (texto e número).
+        */
+        .stTextInput input:disabled,
+        .stNumberInput input:disabled {
+            background-color: #FFFFFF !important; /* Fundo branco */
+            color: #000000 !important;           /* Fonte preta */
+            font-weight: bold;                   /* Texto em negrito para ênfase */
+            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
+        }
         /* Sidebar */
         [data-testid="stSidebar"] {
             background-color: #252526;
