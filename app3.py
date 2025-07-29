@@ -86,7 +86,20 @@ def set_theme():
         .stApp {
             background-color: #1E1E1E;
         }
-        
+        /*
+        **CORREÇÃO DE ESTILO DEFINITIVA**
+        Esta regra é mais específica para garantir que ela sobrescreva os temas padrão do Streamlit.
+        Funciona para campos de texto e numéricos desabilitados.
+        */
+        [data-testid="stAppViewContainer"] .stTextInput input:disabled,
+        [data-testid="stAppViewContainer"] .stNumberInput input:disabled {
+            background-color: #FFFFFF !important;       /* Força fundo branco */
+            color: #000000 !important;                   /* Força texto preto */
+            -webkit-text-fill-color: #000000 !important; /* Propriedade crucial para Chrome/Safari */
+            font-weight: bold;
+            border: 1px solid #CCCCCC;
+        }
+
         /* Sidebar */
         [data-testid="stSidebar"] {
             background-color: #252526;
@@ -240,6 +253,16 @@ def set_theme():
             box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
 
+        /* **CORREÇÃO DE ESTILO AQUI**
+        Define um estilo destacado para o campo de Metragem quando desabilitado.
+        */
+        .stTextInput input:disabled {
+            background-color: #FFFFFF !important; /* Fundo branco */
+            color: #000000 !important;           /* Fonte preta */
+            font-weight: bold;                   /* Texto em negrito para ênfase */
+            border: 1px solid #CCCCCC;           /* Borda sutil para definir o campo */
+        }
+		
         /* EFEITO CLIQUE */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active,
         div[data-testid="stForm"] button[kind="secondary"]:active,
@@ -257,7 +280,6 @@ def set_theme():
         }
     </style>
     """, unsafe_allow_html=True)
-
 
 # --- Funções de Cálculo e Geração de Documentos (sem alterações) ---
 def formatar_moeda(valor, simbolo=True):
