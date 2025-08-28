@@ -417,120 +417,86 @@ def main():
     st.write("\n")
     logo = load_logo()
     if logo:
-        col1, col2 = st.columns([1, 4]); col1.image(logo, width=200, use_container_width=False)
+        col1, col2 = st.columns([1, 4])
+        col1.image(logo, width=200, use_container_width=False)
         col2.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
     else: st.title("Simulador Imobiliária Celeste")
         
     # Inicialização de variáveis de sessão
     if 'taxa_mensal' not in st.session_state:
         st.session_state.taxa_mensal = 0.89
-    if 'quadra' not in st.session_state: st.session_state.quadra = ""
-    if 'lote' not in st.session_state: st.session_state.lote = ""
-    if 'metragem' not in st.session_state: st.session_state.metragem = ""
-    if 'valor_total' not in st.session_state: st.session_state.valor_total = 0.0
-    if 'entrada' not in st.session_state: st.session_state.entrada = 0.0
-    if 'qtd_parcelas' not in st.session_state: st.session_state.qtd_parcelas = 0
-    if 'valor_parcela' not in st.session_state: st.session_state.valor_parcela = 0.0
-    if 'valor_balao' not in st.session_state: st.session_state.valor_balao = 0.0
-    if 'modalidade' not in st.session_state: st.session_state.modalidade = "mensal"
-    if 'tipo_balao' not in st.session_state: st.session_state.tipo_balao = "anual"
-    if 'agendamento_baloes' not in st.session_state: st.session_state.agendamento_baloes = "Padrão"
-    if 'meses_baloes' not in st.session_state: st.session_state.meses_baloes = []
-    if 'mes_primeiro_balao' not in st.session_state: st.session_state.mes_primeiro_balao = 12
+    if 'submitted' not in st.session_state:
+        st.session_state.submitted = False
 
     def reset_form():
-        st.session_state.quadra = ""
-        st.session_state.lote = ""
-        st.session_state.metragem = ""
-        st.session_state.valor_total = 0.0
-        st.session_state.entrada = 0.0
-        st.session_state.qtd_parcelas = 0
-        st.session_state.valor_parcela = 0.0
-        st.session_state.valor_balao = 0.0
-        st.session_state.modalidade = "mensal"
-        st.session_state.tipo_balao = "anual"
-        st.session_state.agendamento_baloes = "Padrão"
-        st.session_state.meses_baloes = []
-        st.session_state.mes_primeiro_balao = 12
-        st.session_state.taxa_mensal = 0.89 # Mantém a taxa como valor padrão
+        st.session_state.clear()
+        st.session_state.taxa_mensal = 0.89
+        st.session_state.submitted = False
+
+    def calculate_form():
+        st.session_state.submitted = True
 
     with st.container():
         cols = st.columns(3)
-        quadra = cols[0].text_input("Quadra", value=st.session_state.quadra, key="quadra_input")
-        lote = cols[1].text_input("Lote", value=st.session_state.lote, key="lote_input")
-        metragem = cols[2].text_input("Metragem (m²)", value=st.session_state.metragem, key="metragem_input")
+        quadra = cols[0].text_input("Quadra", key="quadra_input")
+        lote = cols[1].text_input("Lote", key="lote_input")
+        metragem = cols[2].text_input("Metragem (m²)", key="metragem_input")
     
-    with st.form("simulador_form"):
+    with st.container():
         col1, col2 = st.columns(2)
         with col1:
-            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", value=st.session_state.valor_total, key="valor_total_input")
-            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", value=st.session_state.entrada, key="entrada_input")
+            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total_input")
+            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada_input")
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
             taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.01, format="%.2f", key="taxa_mensal_input")
-            modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], index=["mensal", "mensal + balão", "só balão anual", "só balão semestral"].index(st.session_state.modalidade), key="modalidade_input")
+            modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade_input")
             
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
             if modalidade == "mensal + balão":
-                tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], index=["anual", "semestral"].index(st.session_state.tipo_balao), key="tipo_balao_input")
-                agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], index=["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"].index(st.session_state.agendamento_baloes), key="agendamento_baloes_input")
+                tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao_input")
+                agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], key="agendamento_baloes_input")
                 
-                max_parcelas_seguro = int(st.session_state.get("qtd_parcelas_input", 1))
+                max_parcelas_seguro = st.session_state.get("qtd_parcelas_input", 1)
                 if max_parcelas_seguro <= 0: max_parcelas_seguro = 1
                 
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
-                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), default=st.session_state.meses_baloes, key="meses_baloes_input")
+                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), key="meses_baloes_input")
                 elif agendamento_baloes == "A partir do 1º Vencimento":
-                    valor_padrao_mes = min(st.session_state.mes_primeiro_balao, max_parcelas_seguro)
-                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=valor_padrao_mes, step=1, key="mes_primeiro_balao_input")
+                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=12, step=1, key="mes_primeiro_balao_input")
             
             elif "anual" in modalidade: tipo_balao = "anual"
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
         with col2:
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, value=st.session_state.qtd_parcelas, key="qtd_parcelas_input")
+            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas_input")
             qtd_baloes = 0
             if "balão" in modalidade:
                 if agendamento_baloes == "Personalizado (Mês a Mês)": qtd_baloes = len(meses_baloes)
                 else: qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: **{qtd_baloes}**")
             
-            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=100.0, format="%.2f", value=st.session_state.valor_parcela, key="valor_parcela_input")
+            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela_input")
             valor_balao = 0.0
             if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", value=st.session_state.valor_balao, key="valor_balao_input")
-        
-        col_b1, col_b2, _ = st.columns([1, 1, 4])
-        with col_b1:
-            submitted = st.form_submit_button("Calcular")
-        with col_b2:
-            st.form_submit_button("Reiniciar", on_click=reset_form)
+                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao_input")
+    
+    col_b1, col_b2, _ = st.columns([1, 1, 4])
+    with col_b1:
+        if st.button("Calcular"):
+            calculate_form()
+    with col_b2:
+        if st.button("Reiniciar"):
+            reset_form()
             
-    if submitted:
-        # Atualiza o session state com os valores do formulário
-        st.session_state.quadra = quadra
-        st.session_state.lote = lote
-        st.session_state.metragem = metragem
-        st.session_state.valor_total = valor_total
-        st.session_state.entrada = entrada
-        st.session_state.qtd_parcelas = qtd_parcelas
-        st.session_state.valor_parcela = valor_parcela
-        st.session_state.valor_balao = valor_balao
-        st.session_state.modalidade = modalidade
-        st.session_state.taxa_mensal = taxa_mensal
-        if modalidade == "mensal + balão":
-            st.session_state.tipo_balao = tipo_balao
-            st.session_state.agendamento_baloes = agendamento_baloes
-            st.session_state.meses_baloes = meses_baloes
-            st.session_state.mes_primeiro_balao = mes_primeiro_balao
-
+    if st.session_state.submitted:
         try:
-            taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
+            taxa_mensal_para_calculo = taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
             taxas = calcular_taxas(taxa_mensal_para_calculo); modo = determinar_modo_calculo(modalidade)
             v_p_final, v_b_final = 0.0, 0.0; v_ultima_p, v_ultimo_b = None, None
-            data_entrada = datetime.combine(data_input, datetime.min.time()); dia_vencimento = data_entrada.day
+            data_entrada = datetime.combine(data_input, datetime.min.time()); dia_vencimento = data_input.day
             
             # Lógica de cálculo (permanece a mesma)
             if taxa_mensal_para_calculo == 0.0:
