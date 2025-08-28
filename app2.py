@@ -429,69 +429,156 @@ def main():
         col2.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
     else: st.title("Simulador Imobiliária Celeste")
         
-    if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = 0.89
+    # Inicialização das variáveis de sessão como no código antigo
+    if 'valor_total' not in st.session_state:
+        st.session_state.valor_total = 0.0
+    if 'entrada' not in st.session_state:
+        st.session_state.entrada = 0.0
+    if 'valor_parcela' not in st.session_state:
+        st.session_state.valor_parcela = 0.0
+    if 'valor_balao' not in st.session_state:
+        st.session_state.valor_balao = 0.0
+    if 'quadra' not in st.session_state:
+        st.session_state.quadra = ""
+    if 'lote' not in st.session_state:
+        st.session_state.lote = ""
+    if 'metragem' not in st.session_state:
+        st.session_state.metragem = ""
+    if 'qtd_parcelas' not in st.session_state:
+        st.session_state.qtd_parcelas = 0
+    if 'qtd_baloes' not in st.session_state:
+        st.session_state.qtd_baloes = 0
+    if 'taxa_mensal' not in st.session_state:
+        st.session_state.taxa_mensal = 0.89
     
-    def reset_form(): 
+    def reset_form():
+        """Função de reset que mantém a taxa de juros e limpa os outros campos"""
         taxa_atual = st.session_state.taxa_mensal
-        st.session_state.clear()
+        
+        # Limpa todos os campos
+        st.session_state.valor_total = 0.0
+        st.session_state.entrada = 0.0
+        st.session_state.valor_parcela = 0.0
+        st.session_state.valor_balao = 0.0
+        st.session_state.quadra = ""
+        st.session_state.lote = ""
+        st.session_state.metragem = ""
+        st.session_state.qtd_parcelas = 0
+        st.session_state.qtd_baloes = 0
+        
+        # Restaura o valor da taxa
         st.session_state.taxa_mensal = taxa_atual
 
     with st.container():
-        cols = st.columns(3); quadra = cols[0].text_input("Quadra", key="quadra")
-        lote = cols[1].text_input("Lote", key="lote"); metragem = cols[2].text_input("Metragem (m²)", key="metragem")
+        cols = st.columns(3)
+        quadra = cols[0].text_input("Quadra", value=st.session_state.quadra, key="quadra")
+        lote = cols[1].text_input("Lote", value=st.session_state.lote, key="lote")
+        metragem = cols[2].text_input("Metragem (m²)", value=st.session_state.metragem, key="metragem")
     
     with st.form("simulador_form"):
         col1, col2 = st.columns(2)
         with col1:
-            # CORREÇÃO PRINCIPAL: Aumentar o step para permitir valores maiores
-            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=10000.0, format="%.2f", key="valor_total")
-            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=10000.0, format="%.2f", key="entrada")
-            data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
-            taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.1, format="%.2f", key="taxa_mensal")
-            modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
+            # INPUTS CORRIGIDOS - seguindo a mesma lógica do código antigo
+            valor_total = st.number_input(
+                "Valor Total do Imóvel (R$)", 
+                min_value=0.0, 
+                value=st.session_state.valor_total, 
+                step=1000.0,
+                format="%.2f"
+            )
+            entrada = st.number_input(
+                "Entrada (R$)", 
+                min_value=0.0, 
+                value=st.session_state.entrada, 
+                step=1000.0,
+                format="%.2f"
+            )
+            data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY")
+            taxa_mensal = st.number_input(
+                "Taxa de Juros Mensal (%)", 
+                min_value=0.0, 
+                value=st.session_state.taxa_mensal, 
+                step=0.01,
+                format="%.2f"
+            )
+            modalidade = st.selectbox(
+                "Modalidade de Pagamento", 
+                ["mensal", "mensal + balão", "só balão anual", "só balão semestral"]
+            )
+            
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
             if modalidade == "mensal + balão": 
-                tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao")
-                agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], key="agendamento_baloes")
+                tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"])
+                agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"])
                 
-                # Pre-calcula o maximo de parcelas de forma segura
-                max_parcelas_seguro = int(st.session_state.get("qtd_parcelas", 1))
-                if max_parcelas_seguro <= 0: max_parcelas_seguro = 1 # Garante que o range não seja vazio
+                max_parcelas_seguro = st.session_state.qtd_parcelas
+                if max_parcelas_seguro <= 0: max_parcelas_seguro = 1
                 
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
-                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), key="meses_baloes")
+                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)))
                 elif agendamento_baloes == "A partir do 1º Vencimento":
-                    # AJUSTE: O valor padrão e máximo agora são seguros
                     valor_padrao_mes = min(12, max_parcelas_seguro)
-                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=valor_padrao_mes, step=1, key="mes_primeiro_balao")
+                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=valor_padrao_mes, step=1)
             
             elif "anual" in modalidade: tipo_balao = "anual"
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
         with col2:
-            # AJUSTE: Limite de parcelas removido
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas")
+            qtd_parcelas = st.number_input(
+                "Quantidade de Parcelas", 
+                min_value=0, 
+                value=st.session_state.qtd_parcelas, 
+                step=1
+            )
+            
             qtd_baloes = 0
             if "balão" in modalidade:
-                if agendamento_baloes == "Personalizado (Mês a Mês)": qtd_baloes = len(meses_baloes)
-                else: qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
+                if agendamento_baloes == "Personalizado (Mês a Mês)": 
+                    qtd_baloes = len(meses_baloes)
+                else: 
+                    qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: **{qtd_baloes}**")
             
-            # CORREÇÃO: Aumentar step para permitir valores maiores
-            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_parcela")
+            valor_parcela = st.number_input(
+                "Valor da Parcela (R$)", 
+                min_value=0.0, 
+                value=st.session_state.valor_parcela, 
+                step=100.0,
+                format="%.2f"
+            )
+            
             valor_balao = 0.0
             if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=10000.0, format="%.2f", key="valor_balao")
+                valor_balao = st.number_input(
+                    "Valor do Balão (R$)", 
+                    min_value=0.0, 
+                    value=st.session_state.valor_balao, 
+                    step=1000.0,
+                    format="%.2f"
+                )
         
-        # AJUSTE: Botões movidos para dentro do formulário
         col_b1, col_b2, _ = st.columns([1, 1, 4])
         with col_b1:
             submitted = st.form_submit_button("Calcular")
         with col_b2:
-            st.form_submit_button("Reiniciar", on_click=reset_form)
+            reset = st.form_submit_button("Reiniciar", on_click=reset_form)
     
     if submitted:
         try:
+            # Atualiza todos os valores na sessão
+            st.session_state.update({
+                'valor_total': valor_total,
+                'entrada': entrada,
+                'valor_parcela': valor_parcela,
+                'valor_balao': valor_balao,
+                'quadra': quadra,
+                'lote': lote,
+                'metragem': metragem,
+                'qtd_parcelas': qtd_parcelas,
+                'qtd_baloes': qtd_baloes,
+                'taxa_mensal': taxa_mensal
+            })
+            
             taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
