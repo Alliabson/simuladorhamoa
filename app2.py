@@ -231,7 +231,7 @@ def set_theme():
         .stDownloadButton button:hover {
             background-color: #FF4D4D !important; /* Vermelho vibrante */
             transform: translateY(-2px) !important;
-            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
+            box-shadow: 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
 
         /* EFEITO CLIQUE */
@@ -295,7 +295,7 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
 def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=None):
     try:
         if not isinstance(data_base, datetime): data_base = datetime.combine(data_base, datetime.min.time())
-        ano, mes, dia = data_base.year, data_base.month, data_base.day if dia_vencimento is None else dia_vencimento
+        ano, mes, dia = data_base.year, data_base.month, data_base.day if dia_vencimento is None else data_base.day
         if periodo == "mensal":
             total_meses = mes + num_periodo; ano += (total_meses - 1) // 12; mes = (total_meses - 1) % 12 + 1
         elif periodo == "semestral":
