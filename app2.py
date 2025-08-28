@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 from PIL import Image
 import locale
-from math import ceil, floor
+from math import ceil
 from io import BytesIO
 import os
 import subprocess
@@ -213,7 +213,7 @@ def set_theme():
 
         /* BOTÕES PRINCIPAIS - ESTADO NORMAL (Calcular/Reiniciar/Exportar) */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
-        div[data-testid="stForm"] button[kind="secondary"],
+        div[data-testid="stForm"] button[type="button"], /* Botão de reset */
         .stDownloadButton button {
             background-color: #4D6BFE !important; /* Azul vibrante */
             color: white !important;
@@ -227,16 +227,16 @@ def set_theme():
 
         /* EFEITO HOVER - VERMELHO INTENSO */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
-        div[data-testid="stForm"] button[kind="secondary"]:hover,
+        div[data-testid="stForm"] button[type="button"]:hover,
         .stDownloadButton button:hover {
             background-color: #FF4D4D !important; /* Vermelho vibrante */
             transform: translateY(-2px) !important;
-            box-shadow: 4px 8px rgba(255, 77, 77, 0.2) !important;
+            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
 
         /* EFEITO CLIQUE */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active,
-        div[data-testid="stForm"] button[kind="secondary"]:active,
+        div[data-testid="stForm"] button[type="button"]:active,
         .stDownloadButton button:active {
             transform: translateY(0) !important;
             background-color: #E04444 !important; /* Vermelho mais escuro */
@@ -251,7 +251,6 @@ def set_theme():
         }
     </style>
     """, unsafe_allow_html=True)
-    
 
 # --- Funções de Cálculo Financeiro ---
 
@@ -350,7 +349,7 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
             elif agendamento_baloes == "A partir do 1º Vencimento":
                 data_base_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
-                datas_baloes_a_gerar = [ajustar_data_vencimento(data_base_balao, tipo_balao, i) for i in range(1, qtd_baloes + 1)]
+                datas_baloes_a_gerar = [ajustar_data_vencimento(data_base_balao, tipo_balao, i) for i in range(qtd_baloes)] # 0-indexed range
             else: # Padrão
                 intervalo = 12 if tipo_balao == "anual" else 6
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", i * intervalo, dia_vencimento) for i in range(1, qtd_baloes + 1)]
@@ -394,7 +393,12 @@ def gerar_pdf(cronograma, dados):
         if total:
             pdf.set_font("Arial", 'B', 10); pdf.cell(sum(larguras[:3]), 10, txt="TOTAL", border=1, align='R')
             pdf.cell(larguras[3], 10, txt=formatar_moeda(total['Valor'], simbolo=False), border=1, align='R'); pdf.cell(larguras[4], 10, txt=formatar_moeda(total['Valor_Presente'], simbolo=False), border=1, align='R'); pdf.cell(larguras[5], 10, txt=formatar_moeda(total['Desconto_Aplicado'], simbolo=False), border=1, align='R')
-        return BytesIO(pdf.output())
+        
+        pdf_output = BytesIO()
+        pdf_data = pdf.output(dest='S').encode('latin-1')
+        pdf_output.write(pdf_data)
+        pdf_output.seek(0)
+        return pdf_output
     except Exception as e: st.error(f"Erro ao gerar PDF: {str(e)}"); return BytesIO()
 
 def gerar_excel(cronograma, dados):
@@ -421,7 +425,7 @@ def main():
         col1.image(logo, width=200, use_container_width=False)
         col2.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
     else: st.title("Simulador Imobiliária Celeste")
-        
+    
     # Inicialização de variáveis de sessão
     if 'taxa_mensal' not in st.session_state:
         st.session_state.taxa_mensal = 0.89
@@ -432,18 +436,16 @@ def main():
         st.session_state.clear()
         st.session_state.taxa_mensal = 0.89
         st.session_state.submitted = False
-
-    def calculate_form():
-        st.session_state.submitted = True
-
+    
     with st.container():
         cols = st.columns(3)
         quadra = cols[0].text_input("Quadra", key="quadra_input")
         lote = cols[1].text_input("Lote", key="lote_input")
         metragem = cols[2].text_input("Metragem (m²)", key="metragem_input")
-    
-    with st.container():
+
+    with st.form("simulador_form"):
         col1, col2 = st.columns(2)
+        
         with col1:
             valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total_input")
             entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada_input")
@@ -456,9 +458,13 @@ def main():
                 tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao_input")
                 agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], key="agendamento_baloes_input")
                 
-                max_parcelas_seguro = st.session_state.get("qtd_parcelas_input", 1)
+                # Para que o multiselect funcione, ele precisa do valor de qtd_parcelas, que ainda não foi submetido.
+                # A melhor prática seria não usar st.form, mas para manter a integridade do seu código antigo,
+                # o usuário precisará digitar a quantidade de parcelas e o Streamlit fará um auto-refresh.
+                # Usamos um valor 'placeholder' para a primeira execução.
+                max_parcelas_seguro = st.session_state.get('qtd_parcelas_input_form', 1)
                 if max_parcelas_seguro <= 0: max_parcelas_seguro = 1
-                
+
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
                     meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), key="meses_baloes_input")
                 elif agendamento_baloes == "A partir do 1º Vencimento":
@@ -468,26 +474,34 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
         with col2:
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas_input")
+            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas_input_form")
             qtd_baloes = 0
             if "balão" in modalidade:
-                if agendamento_baloes == "Personalizado (Mês a Mês)": qtd_baloes = len(meses_baloes)
-                else: qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
+                if agendamento_baloes == "Personalizado (Mês a Mês)": 
+                    qtd_baloes = len(meses_baloes)
+                else: 
+                    qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: **{qtd_baloes}**")
             
-            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela_input")
+            valor_parcela = st.number_input("Valor da Parcela (R$ - Deixe 0 para cálculo)", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela_input")
             valor_balao = 0.0
             if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao_input")
-    
-    col_b1, col_b2, _ = st.columns([1, 1, 4])
-    with col_b1:
-        if st.button("Calcular"):
-            calculate_form()
-    with col_b2:
-        if st.button("Reiniciar"):
-            reset_form()
-            
+                valor_balao = st.number_input("Valor do Balão (R$ - Deixe 0 para cálculo)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao_input")
+
+        col_b1, col_b2, _ = st.columns([1, 1, 4])
+        with col_b1:
+            submitted = st.form_submit_button("Calcular")
+        with col_b2:
+            # O botão de reset dentro de um form não pode usar on_click. Ele apenas reseta o form para os valores iniciais.
+            # Para um reset completo, o ideal é movê-lo para fora do form.
+            # Mantendo a estrutura, o reset será um botão de submit que podemos tratar.
+            if st.form_submit_button("Reiniciar"):
+                 reset_form() # Limpa o estado e força o rerender
+                 st.rerun()
+
+    if submitted:
+        st.session_state.submitted = True
+
     if st.session_state.submitted:
         try:
             taxa_mensal_para_calculo = taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
@@ -498,7 +512,7 @@ def main():
             v_p_final, v_b_final = 0.0, 0.0; v_ultima_p, v_ultimo_b = None, None
             data_entrada = datetime.combine(data_input, datetime.min.time()); dia_vencimento = data_input.day
             
-            # Lógica de cálculo (permanece a mesma)
+            # Lógica de cálculo baseada em Valor Presente (do App Novo)
             if taxa_mensal_para_calculo == 0.0:
                 if modo == 1 and qtd_parcelas > 0:
                     vp = round(valor_financiado / qtd_parcelas, 2); dif = round((vp * qtd_parcelas) - valor_financiado, 2)
@@ -534,7 +548,7 @@ def main():
                         datas_b_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
                     elif agendamento_baloes == "A partir do 1º Vencimento":
                         data_base_b = ajustar_data_vencimento(data_input, "mensal", mes_primeiro_balao, dia_vencimento)
-                        datas_b_a_gerar = [ajustar_data_vencimento(data_base_b, tipo_balao, i) for i in range(1, qtd_baloes + 1)]
+                        datas_b_a_gerar = [ajustar_data_vencimento(data_base_b, tipo_balao, i) for i in range(qtd_baloes)]
                     else: # Padrão
                         intervalo_b = 12 if tipo_balao == 'anual' else 6
                         datas_b_a_gerar = [ajustar_data_vencimento(data_input, "mensal", i * intervalo_b, dia_vencimento) for i in range(1, qtd_baloes + 1)]
