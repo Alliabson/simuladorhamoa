@@ -255,6 +255,22 @@ def set_theme():
 
 # --- Funções de Cálculo Financeiro ---
 
+def parse_currency(value_str: str) -> float:
+    """
+    Converte uma string de valor monetário para float.
+    Aceita formatos como "R$ 150.000,50", "150.000,50", "150000,50", etc.
+    """
+    if not isinstance(value_str, str) or not value_str.strip():
+        return 0.0
+    try:
+        # Remove símbolos de moeda, espaços e pontos de milhar
+        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip())
+        # Substitui vírgula decimal por ponto
+        cleaned_value = cleaned_value.replace(',', '.')
+        return float(cleaned_value)
+    except (ValueError, TypeError):
+        return 0.0
+
 def formatar_moeda(valor, simbolo=True):
     try:
         if isinstance(valor, str) and 'R$' in valor: valor = valor.replace('R$', '').strip()
@@ -431,16 +447,16 @@ def main():
         st.session_state.taxa_mensal = taxa_atual
 
     with st.container():
-        cols = st.columns(3); quadra = cols[0].text_input("Quadra", key="quadra")
-        lote = cols[1].text_input("Lote", key="lote"); metragem = cols[2].text_input("Metragem (m²)", key="metragem")
+        cols = st.columns(3); quadra = cols[0].text_input("Quadra", key="quadra", placeholder="Ex: 15")
+        lote = cols[1].text_input("Lote", key="lote", placeholder="Ex: 22"); metragem = cols[2].text_input("Metragem (m²)", key="metragem", placeholder="Ex: 360")
     
     with st.form("simulador_form"):
         col1, col2 = st.columns(2)
         with col1:
-            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total")
-            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada")
+            valor_total_str = st.text_input("Valor Total do Imóvel (R$)", key="valor_total_str", placeholder="Ex: 150.000,50")
+            entrada_str = st.text_input("Entrada (R$)", key="entrada_str", placeholder="Ex: 20.000,00")
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
-            taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.01, format="%.2f", key="taxa_mensal")
+            taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.01, format="%.2f", key="taxa_mensal", help="Use vírgula para decimais (ex: 0,79).")
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
             if modalidade == "mensal + balão": 
@@ -463,16 +479,16 @@ def main():
 
         with col2:
             # AJUSTE: Limite de parcelas removido
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas")
+            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas", placeholder="Ex: 180")
             qtd_baloes = 0
             if "balão" in modalidade:
                 if agendamento_baloes == "Personalizado (Mês a Mês)": qtd_baloes = len(meses_baloes)
                 else: qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: **{qtd_baloes}**")
-            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
-            valor_balao = 0.0
+            valor_parcela_str = st.text_input("Valor da Parcela (R$)", key="valor_parcela_str", placeholder="Deixe em branco para cálculo")
+            valor_balao_str = ""
             if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
+                valor_balao_str = st.text_input("Valor do Balão (R$)", key="valor_balao_str", placeholder="Deixe em branco para cálculo")
         
         # AJUSTE: Botões movidos para dentro do formulário
         col_b1, col_b2, _ = st.columns([1, 1, 4])
@@ -483,6 +499,12 @@ def main():
     
     if submitted:
         try:
+            # Parse dos valores monetários
+            valor_total = parse_currency(valor_total_str)
+            entrada = parse_currency(entrada_str)
+            valor_parcela = parse_currency(valor_parcela_str)
+            valor_balao = parse_currency(valor_balao_str)
+            
             taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
