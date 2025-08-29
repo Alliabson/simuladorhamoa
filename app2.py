@@ -139,7 +139,7 @@ def set_theme():
         }
         
         .dataframe th {
-            background-color: #4D6BFE !important; /* Cor do cabeçalho alterada */
+            background-color: #4D6BFE !important; /* Cor da borda alterada */
             color: white !important;
         }
         
@@ -226,7 +226,7 @@ def set_theme():
         }
 
         /* EFEITO HOVER - VERMELHO INTENSO */
-        div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
+        div[data_testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
         div[data-testid="stForm"] button[kind="secondary"]:hover,
         .stDownloadButton button:hover {
             background-color: #FF4D4D !important; /* Vermelho vibrante */
@@ -265,6 +265,22 @@ def parse_currency(value_str: str) -> float:
     try:
         # Remove símbolos de moeda, espaços e pontos de milhar
         cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip())
+        # Substitui vírgula decimal por ponto
+        cleaned_value = cleaned_value.replace(',', '.')
+        return float(cleaned_value)
+    except (ValueError, TypeError):
+        return 0.0
+
+def parse_percentage(percent_str: str) -> float:
+    """
+    Converte uma string de porcentagem para float.
+    Aceita formatos como "0,89%", "0.89%", "0,89", etc.
+    """
+    if not isinstance(percent_str, str) or not percent_str.strip():
+        return 0.0
+    try:
+        # Remove símbolos de porcentagem e espaços
+        cleaned_value = re.sub(r'[%\s]', '', percent_str.strip())
         # Substitui vírgula decimal por ponto
         cleaned_value = cleaned_value.replace(',', '.')
         return float(cleaned_value)
@@ -311,7 +327,7 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
 def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=None):
     try:
         if not isinstance(data_base, datetime): data_base = datetime.combine(data_base, datetime.min.time())
-        ano, mes, dia = data_base.year, data_base.month, data_base.day if dia_vencimento is None else dia_vencimento
+        ano, mes, dia = data_base.year, data_base.month, data_base.day if dia_vencimento is not None else dia_vencimento
         if periodo == "mensal":
             total_meses = mes + num_periodo; ano += (total_meses - 1) // 12; mes = (total_meses - 1) % 12 + 1
         elif periodo == "semestral":
@@ -439,7 +455,7 @@ def main():
         col2.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
     else: st.title("Simulador Imobiliária Celeste")
         
-    if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = 0.89
+    if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = "0,89"
     
     def reset_form(): 
         taxa_atual = st.session_state.taxa_mensal
@@ -456,7 +472,7 @@ def main():
             valor_total_str = st.text_input("Valor Total do Imóvel (R$)", key="valor_total_str", placeholder="Ex: 150.000,50")
             entrada_str = st.text_input("Entrada (R$)", key="entrada_str", placeholder="Ex: 20.000,00")
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
-            taxa_mensal = st.number_input("Taxa de Juros Mensal (%)", min_value=0.00, value=st.session_state.taxa_mensal, step=0.01, format="%.2f", key="taxa_mensal", help="Use vírgula para decimais (ex: 0,79).")
+            taxa_mensal_str = st.text_input("Taxa de Juros Mensal (%)", value=st.session_state.taxa_mensal, key="taxa_mensal_str", placeholder="Ex: 0,89")
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
             if modalidade == "mensal + balão": 
@@ -499,13 +515,17 @@ def main():
     
     if submitted:
         try:
-            # Parse dos valores monetários
+            # Parse dos valores monetários e da taxa
             valor_total = parse_currency(valor_total_str)
             entrada = parse_currency(entrada_str)
             valor_parcela = parse_currency(valor_parcela_str)
             valor_balao = parse_currency(valor_balao_str)
+            taxa_mensal = parse_percentage(taxa_mensal_str)
             
-            taxa_mensal_para_calculo = st.session_state.taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
+            # Atualiza a taxa na session state
+            st.session_state.taxa_mensal = taxa_mensal_str
+            
+            taxa_mensal_para_calculo = taxa_mensal if not (1 <= qtd_parcelas <= 36 and modalidade == 'mensal') else 0.0
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
