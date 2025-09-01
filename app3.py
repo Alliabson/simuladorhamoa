@@ -58,8 +58,6 @@ def load_logo():
     Carrega e redimensiona a imagem da logo.
     """
     try:
-        # Tente carregar a imagem. Se você estiver executando localmente,
-        # certifique-se de que o arquivo 'JMD HAMOA HORIZONTAL - BRANCO.png' está na mesma pasta.
         logo = Image.open("JMD HAMOA HORIZONTAL - BRANCO.png")
         logo.thumbnail((300, 300))
         return logo
@@ -257,66 +255,38 @@ def set_theme():
 
 # --- Funções de Cálculo Financeiro ---
 
+# --- Funções de Cálculo Financeiro ---
+
 def parse_currency(value_str: str) -> float:
-    """
-    Converte uma string de valor monetário para float.
-    Aceita formatos como "R$ 150.000,50", "150.000,50", "150000,50", etc.
-    """
-    if not isinstance(value_str, str) or not value_str.strip():
-        return 0.0
+    if not isinstance(value_str, str) or not value_str.strip(): return 0.0
     try:
-        # Remove símbolos de moeda, espaços e pontos de milhar
-        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip())
-        # Substitui vírgula decimal por ponto
-        cleaned_value = cleaned_value.replace(',', '.')
+        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip()).replace(',', '.')
         return float(cleaned_value)
-    except (ValueError, TypeError):
-        return 0.0
+    except (ValueError, TypeError): return 0.0
 
 def parse_percentage(percent_str: str) -> float:
-    """
-    Converte uma string de porcentagem para float.
-    Aceita formatos como "0,89%", "0.89%", "0,89", etc.
-    """
-    if not isinstance(percent_str, str) or not percent_str.strip():
-        return 0.0
+    if not isinstance(percent_str, str) or not percent_str.strip(): return 0.0
     try:
-        # Remove símbolos de porcentagem e espaços
-        cleaned_value = re.sub(r'[%\s]', '', percent_str.strip())
-        # Substitui vírgula decimal por ponto
-        cleaned_value = cleaned_value.replace(',', '.')
+        cleaned_value = re.sub(r'[%\s]', '', percent_str.strip()).replace(',', '.')
         return float(cleaned_value)
-    except (ValueError, TypeError):
-        return 0.0
+    except (ValueError, TypeError): return 0.0
 
 def formatar_moeda(valor, simbolo=True):
     try:
         if isinstance(valor, str) and 'R$' in valor: valor = valor.replace('R$', '').strip()
         if valor is None or valor == '': return "R$ 0,00" if simbolo else "0,00"
         if isinstance(valor, str): valor = re.sub(r'\.', '', valor).replace(',', '.'); valor = float(valor)
-        valor_abs, parte_inteira = abs(valor), int(abs(valor))
-        parte_decimal = int(round((valor_abs - parte_inteira) * 100))
-        parte_inteira_str = f"{parte_inteira:,}".replace(",", ".")
-        valor_formatado = f"{parte_inteira_str},{parte_decimal:02d}"
-        if valor < 0: valor_formatado = f"-{valor_formatado}"
-        return f"R$ {valor_formatado}" if simbolo else valor_formatado
+        return locale.currency(valor, grouping=True, symbol=simbolo)
     except Exception: return "R$ 0,00" if simbolo else "0,00"
 
 def calcular_taxas(taxa_mensal_percentual):
-    """
-    Calcula as taxas de juros. A conversão para taxa diária foi revertida 
-    para a fórmula original, que se aproxima mais da sua tabela de preços.
-    """
     try:
         taxa_mensal_decimal = float(taxa_mensal_percentual) / 100
         taxa_anual = ((1 + taxa_mensal_decimal) ** 12) - 1
         taxa_semestral = ((1 + taxa_mensal_decimal) ** 6) - 1
-        # REVERTIDO: Usando a fórmula original que se aproxima da sua planilha
         taxa_diaria = ((1 + taxa_mensal_decimal) ** (1/30.4375)) - 1
         return {'anual': taxa_anual, 'semestral': taxa_semestral, 'mensal': taxa_mensal_decimal, 'diaria': taxa_diaria}
-    except Exception: 
-        return {'anual': 0, 'semestral': 0, 'mensal': 0, 'diaria': 0}
-
+    except Exception: return {'anual': 0, 'semestral': 0, 'mensal': 0, 'diaria': 0}
 
 def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
     try:
@@ -333,43 +303,35 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
         if dias > 0: fator_total += 1 / ((1 + taxa_diaria) ** dias)
     return fator_total
 
+# NOVO: FUNÇÃO QUE REPLICA O PGTO DO EXCEL
+def calcular_pgto(taxa_periodo, num_periodos, valor_presente):
+    """
+    Calcula o valor do pagamento por período, replicando a função PGTO (PMT) do Excel.
+    """
+    if taxa_periodo == 0:
+        return valor_presente / num_periodos if num_periodos > 0 else 0
+    
+    return (valor_presente * taxa_periodo) / (1 - (1 + taxa_periodo) ** -num_periodos)
+
 def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=None):
-    """
-    Calcula uma data futura com base em um período (mensal, semestral, anual).
-    É robusto contra meses com diferentes quantidades de dias.
-    """
     try:
         if not isinstance(data_base, datetime):
             data_base = datetime.combine(data_base, datetime.min.time())
-
         dia = dia_vencimento if dia_vencimento is not None else data_base.day
-
         months_to_add = 0
-        if periodo == "mensal":
-            months_to_add = num_periodo
-        elif periodo == "semestral":
-            months_to_add = 6 * num_periodo
-        elif periodo == "anual":
-            months_to_add = 12 * num_periodo
-
-        if months_to_add == 0:
-            return data_base
-
+        if periodo == "mensal": months_to_add = num_periodo
+        elif periodo == "semestral": months_to_add = 6 * num_periodo
+        elif periodo == "anual": months_to_add = 12 * num_periodo
+        if months_to_add == 0: return data_base
         total_meses = data_base.month + months_to_add
         novo_ano = data_base.year + (total_meses - 1) // 12
         novo_mes = (total_meses - 1) % 12 + 1
-
         try:
             return datetime(novo_ano, novo_mes, dia)
         except ValueError:
-            if novo_mes == 12:
-                ultimo_dia_do_mes = 31
-            else:
-                ultimo_dia_do_mes = (datetime(novo_ano, novo_mes + 1, 1) - timedelta(days=1)).day
+            ultimo_dia_do_mes = 31 if novo_mes == 12 else (datetime(novo_ano, novo_mes + 1, 1) - timedelta(days=1)).day
             return datetime(novo_ano, novo_mes, ultimo_dia_do_mes)
-    except Exception:
-        return data_base + timedelta(days=30 * (months_to_add or num_periodo))
-
+    except Exception: return data_base + timedelta(days=30 * (months_to_add or num_periodo))
 
 def determinar_modo_calculo(modalidade):
     return {"mensal": 1, "mensal + balão": 2, "só balão anual": 3, "só balão semestral": 4}.get(modalidade, 1)
@@ -416,17 +378,14 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             datas_baloes_a_gerar = []
             if agendamento_baloes == "Personalizado (Mês a Mês)":
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
-            
             elif agendamento_baloes == "A partir do 1º Vencimento":
                 primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
                 datas_baloes_a_gerar.append(primeira_data_balao)
-                
                 data_anterior = primeira_data_balao
                 for _ in range(1, qtd_baloes):
                     proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento)
                     datas_baloes_a_gerar.append(proxima_data_balao)
                     data_anterior = proxima_data_balao
-
             else: # Padrão
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
             
@@ -570,82 +529,56 @@ def main():
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
-            taxas = calcular_taxas(taxa_mensal_para_calculo); modo = determinar_modo_calculo(modalidade)
-            v_p_final, v_b_final = 0.0, 0.0; v_ultima_p, v_ultimo_b = None, None
-            data_entrada = datetime.combine(data_input, datetime.min.time()); dia_vencimento = data_entrada.day
+            taxas = calcular_taxas(taxa_mensal_para_calculo)
+            data_entrada = datetime.combine(data_input, datetime.min.time())
             
-            if taxa_mensal_para_calculo == 0.0:
-                if modo == 1 and qtd_parcelas > 0:
-                    vp = round(valor_financiado / qtd_parcelas, 2); dif = round((vp * qtd_parcelas) - valor_financiado, 2)
-                    v_p_final = vp; v_ultima_p = vp - dif
-                elif modo in [3, 4] and qtd_baloes > 0:
-                    vb = round(valor_financiado / qtd_baloes, 2); dif = round((vb * qtd_baloes) - valor_financiado, 2)
-                    v_b_final = vb; v_ultimo_b = vb - dif
-                elif modo == 2 and ((qtd_parcelas or 0) > 0 or qtd_baloes > 0):
-                    if valor_parcela > 0 and valor_balao == 0:
-                        v_p_final = valor_parcela
-                        vp_total_parcelas = valor_parcela * (qtd_parcelas or 0)
-                        vp_restante = valor_financiado - vp_total_parcelas
-                        if qtd_baloes > 0 and vp_restante > 0:
-                            vb = round(vp_restante / qtd_baloes, 2)
-                            dif = round((vb * qtd_baloes) - vp_restante, 2)
-                            v_b_final = vb; v_ultimo_b = vb - dif
-                        elif vp_restante < 0:
-                            st.error("O valor total das parcelas excede o valor financiado.")
-                            return
-                    elif valor_balao > 0 and valor_parcela == 0:
-                        v_b_final = valor_balao
-                        vp_total_baloes = valor_balao * qtd_baloes
-                        vp_restante = valor_financiado - vp_total_baloes
-                        if (qtd_parcelas or 0) > 0 and vp_restante > 0:
-                            vp = round(vp_restante / qtd_parcelas, 2)
-                            dif = round((vp * qtd_parcelas) - vp_restante, 2)
-                            v_p_final = vp; v_ultima_p = vp - dif
-                        elif vp_restante < 0:
-                            st.error("O valor total dos balões excede o valor financiado.")
-                            return
-                    else: st.error("No modo 'mensal + balão', informe OU o valor da parcela OU o valor do balão."); return
-            else: # Lógica para planos com juros
-                qtd_p_calc = qtd_parcelas or 0
-                
-                datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, qtd_p_calc + 1)]
-                datas_b = []
-                if "balão" in modalidade and qtd_baloes > 0:
-                    if agendamento_baloes == "Personalizado (Mês a Mês)":
-                        datas_b = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
-                    elif agendamento_baloes == "A partir do 1º Vencimento":
-                        primeira_data_b = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
-                        datas_b = [primeira_data_b]
-                        data_anterior_b = primeira_data_b
-                        for _ in range(1, qtd_baloes):
-                            proxima_data_b = ajustar_data_vencimento(data_anterior_b, tipo_balao, 1, dia_vencimento)
-                            datas_b.append(proxima_data_b)
-                            data_anterior_b = proxima_data_b
-                    else: # Padrão
-                        datas_b = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
-                
-                fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria']) if qtd_p_calc > 0 else 0
-                fator_vp_b = calcular_fator_vp(datas_b, data_entrada, taxas['diaria']) if qtd_baloes > 0 else 0
-                
-                if valor_parcela > 0 and valor_balao == 0:
-                    v_p_final = valor_parcela
-                    vp_restante = max(valor_financiado - (v_p_final * fator_vp_p), 0)
-                    if qtd_baloes > 0:
-                       v_b_final = round(vp_restante / fator_vp_b, 2) if fator_vp_b > 0 else 0
-                elif valor_balao > 0 and valor_parcela == 0:
-                    v_b_final = valor_balao
-                    vp_restante = max(valor_financiado - (v_b_final * fator_vp_b), 0)
-                    if qtd_p_calc > 0:
-                       v_p_final = round(vp_restante / fator_vp_p, 2) if fator_vp_p > 0 else 0
-                elif valor_parcela == 0 and valor_balao == 0:
-                     if modo == 1: v_p_final = round(valor_financiado / fator_vp_p, 2) if fator_vp_p > 0 else 0
-                     elif modo in [3, 4]: v_b_final = round(valor_financiado / fator_vp_b, 2) if fator_vp_b > 0 else 0
-                     else: st.error("Para cálculo automático em modo misto, preencha o valor da Parcela ou do Balão."); return
-                else: # Ambos os valores foram preenchidos
-                    v_p_final = valor_parcela
-                    v_b_final = valor_balao
+            v_p_final = valor_parcela
+            v_b_final = valor_balao
 
-            cronograma = gerar_cronograma(valor_financiado, v_p_final, v_b_final, (qtd_parcelas or 0), qtd_baloes, modalidade, tipo_balao, data_entrada, taxas, valor_ultima_parcela=v_ultima_p, valor_ultimo_balao=v_ultimo_b, agendamento_baloes=agendamento_baloes, meses_baloes=meses_baloes, mes_primeiro_balao=mes_primeiro_balao)
+            # LÓGICA DE CÁLCULO ATUALIZADA PARA ESPELHAR EXCEL
+            if valor_parcela > 0 and valor_balao == 0: # Calcula o balão
+                datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, (qtd_parcelas or 0) + 1)]
+                fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria'])
+                vp_parcelas = v_p_final * fator_vp_p
+                vp_baloes = valor_financiado - vp_parcelas
+
+                if qtd_baloes > 0 and tipo_balao:
+                    if tipo_balao == 'anual':
+                        taxa_periodo = taxas['anual']
+                    else: # semestral
+                        taxa_periodo = taxas['semestral']
+                    
+                    v_b_final = calcular_pgto(taxa_periodo, qtd_baloes, vp_baloes)
+            
+            elif valor_balao > 0 and valor_parcela == 0: # Calcula a parcela
+                vp_baloes = 0
+                if qtd_baloes > 0 and tipo_balao:
+                    # Para calcular o VP dos balões, precisamos das datas
+                    datas_b = [ajustar_data_vencimento(data_entrada, tipo_balao, i) for i in range(1, qtd_baloes + 1)]
+                    for data in datas_b:
+                        dias = (data - data_entrada).days
+                        vp_baloes += calcular_valor_presente(v_b_final, taxas['diaria'], dias)
+
+                vp_parcelas = valor_financiado - vp_baloes
+                datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, (qtd_parcelas or 0) + 1)]
+                fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria'])
+
+                if fator_vp_p > 0:
+                    v_p_final = vp_parcelas / fator_vp_p
+            
+            elif valor_parcela == 0 and valor_balao == 0: # Calcula o que for possível
+                if modalidade == 'mensal':
+                    datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, (qtd_parcelas or 0) + 1)]
+                    fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria'])
+                    if fator_vp_p > 0: v_p_final = valor_financiado / fator_vp_p
+                elif 'só balão' in modalidade:
+                    taxa_periodo = taxas['anual'] if tipo_balao == 'anual' else taxas['semestral']
+                    v_b_final = calcular_pgto(taxa_periodo, qtd_baloes, valor_financiado)
+                else:
+                    st.error("Para cálculo automático em modo misto, preencha o valor da Parcela ou do Balão.")
+                    return
+
+            cronograma = gerar_cronograma(valor_financiado, round(v_p_final, 2), round(v_b_final, 2), (qtd_parcelas or 0), qtd_baloes, modalidade, tipo_balao, data_entrada, taxas, agendamento_baloes=agendamento_baloes, meses_baloes=meses_baloes, mes_primeiro_balao=mes_primeiro_balao)
             
             st.subheader("Resultados da Simulação")
             c1, c2, c3, c4 = st.columns(4)
