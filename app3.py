@@ -302,31 +302,18 @@ def formatar_moeda(valor, simbolo=True):
         return f"R$ {valor_formatado}" if simbolo else valor_formatado
     except Exception: return "R$ 0,00" if simbolo else "0,00"
 
-# FUNÇÃO CORRIGIDA PARA MAIOR PRECISÃO
 def calcular_taxas(taxa_mensal_percentual):
     """
-    Calcula as taxas de juros. A conversão para taxa diária foi ajustada
-    para o padrão de mercado (252 dias úteis), que é mais preciso para
-    cálculos financeiros e deve corresponder melhor a sistemas externos.
+    Calcula as taxas de juros. A conversão para taxa diária foi revertida 
+    para a fórmula original, que se aproxima mais da sua tabela de preços.
     """
     try:
         taxa_mensal_decimal = float(taxa_mensal_percentual) / 100
-        
-        # A taxa anual continua composta sobre a mensal
         taxa_anual = ((1 + taxa_mensal_decimal) ** 12) - 1
-        
-        # AJUSTE CRÍTICO: Cálculo da taxa diária via taxa anual e 252 dias úteis
-        # Este é o padrão de mercado (ANBIMA) e a causa mais provável da divergência.
-        taxa_diaria = ((1 + taxa_anual) ** (1/252)) - 1
-        
         taxa_semestral = ((1 + taxa_mensal_decimal) ** 6) - 1
-        
-        return {
-            'anual': taxa_anual, 
-            'semestral': taxa_semestral, 
-            'mensal': taxa_mensal_decimal, 
-            'diaria': taxa_diaria
-        }
+        # REVERTIDO: Usando a fórmula original que se aproxima da sua planilha
+        taxa_diaria = ((1 + taxa_mensal_decimal) ** (1/30.4375)) - 1
+        return {'anual': taxa_anual, 'semestral': taxa_semestral, 'mensal': taxa_mensal_decimal, 'diaria': taxa_diaria}
     except Exception: 
         return {'anual': 0, 'semestral': 0, 'mensal': 0, 'diaria': 0}
 
