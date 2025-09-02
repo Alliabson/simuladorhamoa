@@ -58,6 +58,8 @@ def load_logo():
     Carrega e redimensiona a imagem da logo.
     """
     try:
+        # Tente carregar a imagem. Se você estiver executando localmente,
+        # certifique-se de que o arquivo 'JMD HAMOA HORIZONTAL - BRANCO.png' está na mesma pasta.
         logo = Image.open("JMD HAMOA HORIZONTAL - BRANCO.png")
         logo.thumbnail((300, 300))
         return logo
@@ -72,62 +74,247 @@ def set_theme():
     """
     Aplica estilos CSS personalizados para um tema escuro
     e aprimora a aparência dos componentes do Streamlit.
+    Inclui estilos para botões com efeitos de hover e clique.
     """
     st.markdown("""
     <style>
-        .stApp { background-color: #1E1E1E; }
-        [data-testid="stSidebar"] { background-color: #252526; }
-        h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #FFFFFF; }
-        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label { color: #E0E0E0; }
-        .stTextInput input, .stNumberInput input, .stSelectbox select, .stDateInput input { background-color: #333333; color: #FFFFFF; border-color: #555555; }
-        .stMetric { background-color: #252526; border-radius: 8px; padding: 15px; border-left: 4px solid #4D6BFE; }
-        .stMetric label { color: #A0A0A0 !important; }
-        .stMetric div { color: #FFFFFF !important; font-size: 24px !important; }
-        .dataframe { background-color: #252526 !important; color: #E0E0E0 !important; }
-        .dataframe th { background-color: #4D6BFE !important; color: white !important; }
-        .dataframe tr:nth-child(even) { background-color: #333333 !important; }
-        .dataframe tr:hover { background-color: #444444 !important; }
-        h1, h2, h3, .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label, .stSubheader, .stDownloadButton label { color: #FFFFFF !important; }
-        div[data-testid="stForm"] label, div[data-testid="stVerticalBlock"] > div > div > div > div > label { color: #FFFFFF !important; }
-        div[data-testid="stForm"] button[kind="secondaryFormSubmit"], div[data-testid="stForm"] button[kind="secondary"], .stDownloadButton button { background-color: #4D6BFE !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 10px 24px !important; font-weight: 600 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; }
-        div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover, div[data-testid="stForm"] button[kind="secondary"]:hover, .stDownloadButton button:hover { background-color: #FF4D4D !important; transform: translateY(-2px) !important; box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important; }
-        div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active, div[data-testid="stForm"] button[kind="secondary"]:active, .stDownloadButton button:active { transform: translateY(0) !important; background-color: #E04444 !important; }
-        div[data-testid="stForm"] button > div > p, .stDownloadButton button > div > p { color: white !important; font-size: 14px !important; margin: 0 !important; }
+        /* Fundo principal */
+        .stApp {
+            background-color: #1E1E1E;
+        }
+        
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #252526;
+        }
+        
+        /* Títulos */
+        h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+            color: #FFFFFF;
+        }
+        
+        /* Texto geral */
+        .stMarkdown p, .stMarkdown li, .stText, .stNumberInput label, .stSelectbox label {
+            color: #E0E0E0;
+        }
+        
+        /* Inputs */
+        .stTextInput input, .stNumberInput input, .stSelectbox select {
+            background-color: #333333;
+            color: #FFFFFF;
+            border-color: #555555;
+        }
+        
+        /* Botões padrão (não os customizados abaixo) */
+        .stButton button {
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        
+        .stButton button:hover {
+            background-color: #003d82;
+        }
+        
+        /* Cards/metricas */
+        .stMetric {
+            background-color: #252526;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #4D6BFE; /* Cor da borda alterada para combinar com os botões */
+        }
+        
+        .stMetric label {
+            color: #A0A0A0 !important;
+        }
+        
+        .stMetric div {
+            color: #FFFFFF !important;
+            font-size: 24px !important;
+        }
+        
+        /* Dataframe */
+        .dataframe {
+            background-color: #252526 !important;
+            color: #E0E0E0 !important;
+        }
+        
+        .dataframe th {
+            background-color: #4D6BFE !important; /* Cor da borda alterada */
+            color: white !important;
+        }
+        
+        .dataframe tr:nth-child(even) {
+            background-color: #333333 !important;
+        }
+        
+        .dataframe tr:hover {
+            background-color: #444444 !important;
+        }
+
+        /* ===== LAYOUT ===== */
+        /* Container principal */
+        .main .block-container {
+            padding: 2rem 1rem !important;
+        }
+
+        /* Colunas e alinhamento */
+        [data-testid="column"] {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 0 !important;
+        }
+
+        /* Espaçamento entre botões */
+        .stButton:first-of-type {
+            margin-right: 8px !important;
+        }
+
+        /* ===== FLICKERING FIX ===== */
+        [data-testid="stDataFrame-container"] {
+            will-change: transform !important;
+            contain: strict !important;
+            min-height: 400px !important;
+            transform: translate3d(0, 0, 0) !important;
+            backface-visibility: hidden !important;
+            perspective: 1000px !important;
+        }
+
+        .stDataFrame-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            z-index: 9999 !important;
+            background-color: #0E1117 !important;
+            padding: 2rem !important;
+            overflow: auto !important;
+        }
+
+        /* Títulos específicos para cor branca */
+        h1, h2, h3, h4, h5, h6, 
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+        /* Textos de input/labels */
+        .stTextInput label, .stNumberInput label, 
+        .stSelectbox label, .stDateInput label,
+        /* Subtítulos das seções */
+        .stSubheader,
+        /* Botões de exportação (labels) */
+        .stDownloadButton label {
+            color: #FFFFFF !important;
+        }
+        
+        /* Labels específicos que não são capturados pelas regras acima */
+        div[data-testid="stForm"] label,
+        div[data-testid="stVerticalBlock"] > div > div > div > div > label {
+            color: #FFFFFF !important;
+        }
+
+        /* BOTÕES PRINCIPAIS - ESTADO NORMAL (Calcular/Reiniciar/Exportar) */
+        div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
+        div[data-testid="stForm"] button[kind="secondary"],
+        .stDownloadButton button {
+            background-color: #4D6BFE !important; /* Azul vibrante */
+            color: white !important;
+            border: none !important;
+            border-radius: 12px !important; /* Bordas super arredondadas */
+            padding: 10px 24px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        /* EFEITO HOVER - VERMELHO INTENSO */
+        div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
+        div[data-testid="stForm"] button[kind="secondary"]:hover,
+        .stDownloadButton button:hover {
+            background-color: #FF4D4D !important; /* Vermelho vibrante */
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
+        }
+
+        /* EFEITO CLIQUE */
+        div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:active,
+        div[data-testid="stForm"] button[kind="secondary"]:active,
+        .stDownloadButton button:active {
+            transform: translateY(0) !important;
+            background-color: #E04444 !important; /* Vermelho mais escuro */
+        }
+
+        /* TEXTO DOS BOTÕES */
+        div[data-testid="stForm"] button > div > p,
+        .stDownloadButton button > div > p {
+            color: white !important;
+            font-size: 14px !important;
+            margin: 0 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
 # --- Funções de Cálculo Financeiro ---
 
 def parse_currency(value_str: str) -> float:
-    if not isinstance(value_str, str) or not value_str.strip(): return 0.0
+    """
+    Converte uma string de valor monetário para float.
+    Aceita formatos como "R$ 150.000,50", "150.000,50", "150000,50", etc.
+    """
+    if not isinstance(value_str, str) or not value_str.strip():
+        return 0.0
     try:
-        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip()).replace(',', '.')
+        # Remove símbolos de moeda, espaços e pontos de milhar
+        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip())
+        # Substitui vírgula decimal por ponto
+        cleaned_value = cleaned_value.replace(',', '.')
         return float(cleaned_value)
-    except (ValueError, TypeError): return 0.0
+    except (ValueError, TypeError):
+        return 0.0
 
 def parse_percentage(percent_str: str) -> float:
-    if not isinstance(percent_str, str) or not percent_str.strip(): return 0.0
+    """
+    Converte uma string de porcentagem para float.
+    Aceita formatos como "0,89%", "0.89%", "0,89", etc.
+    """
+    if not isinstance(percent_str, str) or not percent_str.strip():
+        return 0.0
     try:
-        cleaned_value = re.sub(r'[%\s]', '', percent_str.strip()).replace(',', '.')
+        # Remove símbolos de porcentagem e espaços
+        cleaned_value = re.sub(r'[%\s]', '', percent_str.strip())
+        # Substitui vírgula decimal por ponto
+        cleaned_value = cleaned_value.replace(',', '.')
         return float(cleaned_value)
-    except (ValueError, TypeError): return 0.0
+    except (ValueError, TypeError):
+        return 0.0
 
 def formatar_moeda(valor, simbolo=True):
     try:
         if isinstance(valor, str) and 'R$' in valor: valor = valor.replace('R$', '').strip()
         if valor is None or valor == '': return "R$ 0,00" if simbolo else "0,00"
         if isinstance(valor, str): valor = re.sub(r'\.', '', valor).replace(',', '.'); valor = float(valor)
-        return locale.currency(valor, grouping=True, symbol=simbolo)
+        valor_abs, parte_inteira = abs(valor), int(abs(valor))
+        parte_decimal = int(round((valor_abs - parte_inteira) * 100))
+        parte_inteira_str = f"{parte_inteira:,}".replace(",", ".")
+        valor_formatado = f"{parte_inteira_str},{parte_decimal:02d}"
+        if valor < 0: valor_formatado = f"-{valor_formatado}"
+        return f"R$ {valor_formatado}" if simbolo else valor_formatado
     except Exception: return "R$ 0,00" if simbolo else "0,00"
 
 def calcular_taxas(taxa_mensal_percentual):
+    """
+    Calcula as taxas de juros equivalentes com base na taxa mensal.
+    CORREÇÃO: A taxa diária agora é calculada usando 1/30 para alinhar com o Excel.
+    """
     try:
         taxa_mensal_decimal = float(taxa_mensal_percentual) / 100
         taxa_anual = ((1 + taxa_mensal_decimal) ** 12) - 1
         taxa_semestral = ((1 + taxa_mensal_decimal) ** 6) - 1
-        taxa_diaria = ((1 + taxa_mensal_decimal) ** (1/30.4375)) - 1
+        # CORREÇÃO AQUI: trocamos 30.4375 por 30
+        taxa_diaria = ((1 + taxa_mensal_decimal) ** (1/30)) - 1
         return {'anual': taxa_anual, 'semestral': taxa_semestral, 'mensal': taxa_mensal_decimal, 'diaria': taxa_diaria}
-    except Exception: return {'anual': 0, 'semestral': 0, 'mensal': 0, 'diaria': 0}
+    except Exception:
+        return {'anual': 0, 'semestral': 0, 'mensal': 0, 'diaria': 0}
 
 def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
     try:
@@ -136,7 +323,7 @@ def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
     except Exception: return float(valor_futuro)
 
 def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
-    if taxa_diaria <= 0: return float(len(datas_vencimento))
+    if taxa_diaria <= 0: return len(datas_vencimento)
     fator_total = 0.0
     for data_venc in datas_vencimento:
         if not isinstance(data_venc, datetime): data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
@@ -144,35 +331,44 @@ def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
         if dias > 0: fator_total += 1 / ((1 + taxa_diaria) ** dias)
     return fator_total
 
-def calcular_pgto(taxa_periodo, num_periodos, valor_presente):
-    if taxa_periodo == 0:
-        return valor_presente / num_periodos if num_periodos > 0 else 0
-    return (valor_presente * taxa_periodo) / (1 - (1 + taxa_periodo) ** -num_periodos)
-
-def calcular_vp(taxa_periodo, num_periodos, pgto):
-    if taxa_periodo == 0:
-        return pgto * num_periodos if num_periodos > 0 else 0
-    return pgto * (1 - (1 + taxa_periodo) ** -num_periodos) / taxa_periodo
-
+# FUNÇÃO REVISADA PARA GARANTIR CÁLCULO CORRETO DE MESES
 def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=None):
+    """
+    Calcula uma data futura com base em um período (mensal, semestral, anual).
+    É robusto contra meses com diferentes quantidades de dias.
+    """
     try:
         if not isinstance(data_base, datetime):
             data_base = datetime.combine(data_base, datetime.min.time())
+
         dia = dia_vencimento if dia_vencimento is not None else data_base.day
+
         months_to_add = 0
-        if periodo == "mensal": months_to_add = num_periodo
-        elif periodo == "semestral": months_to_add = 6 * num_periodo
-        elif periodo == "anual": months_to_add = 12 * num_periodo
-        if months_to_add == 0: return data_base
+        if periodo == "mensal":
+            months_to_add = num_periodo
+        elif periodo == "semestral":
+            months_to_add = 6 * num_periodo
+        elif periodo == "anual":
+            months_to_add = 12 * num_periodo
+
+        if months_to_add == 0:
+            return data_base
+
         total_meses = data_base.month + months_to_add
         novo_ano = data_base.year + (total_meses - 1) // 12
         novo_mes = (total_meses - 1) % 12 + 1
+
         try:
             return datetime(novo_ano, novo_mes, dia)
         except ValueError:
-            ultimo_dia_do_mes = 31 if novo_mes == 12 else (datetime(novo_ano, novo_mes + 1, 1) - timedelta(days=1)).day
+            if novo_mes == 12:
+                ultimo_dia_do_mes = 31
+            else:
+                ultimo_dia_do_mes = (datetime(novo_ano, novo_mes + 1, 1) - timedelta(days=1)).day
             return datetime(novo_ano, novo_mes, ultimo_dia_do_mes)
-    except Exception: return data_base + timedelta(days=30 * (months_to_add or num_periodo))
+    except Exception:
+        return data_base + timedelta(days=30 * (months_to_add or num_periodo))
+
 
 def determinar_modo_calculo(modalidade):
     return {"mensal": 1, "mensal + balão": 2, "só balão anual": 3, "só balão semestral": 4}.get(modalidade, 1)
@@ -219,15 +415,20 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             datas_baloes_a_gerar = []
             if agendamento_baloes == "Personalizado (Mês a Mês)":
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
+            
             elif agendamento_baloes == "A partir do 1º Vencimento":
                 primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
                 datas_baloes_a_gerar.append(primeira_data_balao)
+                
                 data_anterior = primeira_data_balao
                 for _ in range(1, qtd_baloes):
+                    # CORREÇÃO: Usa o dia de vencimento original para os cálculos subsequentes
                     proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento)
                     datas_baloes_a_gerar.append(proxima_data_balao)
                     data_anterior = proxima_data_balao
+
             else: # Padrão
+                # LÓGICA PADRÃO SIMPLIFICADA E CORRIGIDA
                 datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
             
             for i, data_vencimento in enumerate(datas_baloes_a_gerar):
@@ -237,6 +438,7 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                 vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias)
                 baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
         
+        # AJUSTE DE ORDENAÇÃO: Ordena cada lista separadamente e depois as combina.
         parcelas_sorted = sorted(parcelas, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         baloes_sorted = sorted(baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         cronograma = parcelas_sorted + baloes_sorted
@@ -253,12 +455,45 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
 
 
 def gerar_pdf(cronograma, dados):
-    # ... (código mantido, sem alterações)
-    pass
+    try:
+        pdf = FPDF(); pdf.add_page(); pdf.set_font("Arial", 'B', 14)
+        pdf.cell(200, 10, txt="Informações do Imóvel", ln=1, align='L'); pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt=f"Quadra: {dados.get('quadra', 'N/I')}", ln=1); pdf.cell(200, 10, txt=f"Lote: {dados.get('lote', 'N/I')}", ln=1); pdf.cell(200, 10, txt=f"Metragem: {dados.get('metragem', 'N/I')} m²", ln=1)
+        pdf.ln(5); pdf.set_font("Arial", 'B', 14)
+        pdf.cell(200, 10, txt="Simulação de Financiamento", ln=1, align='L'); pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt=f"Valor Total do Imóvel: {formatar_moeda(dados['valor_total'])}", ln=1); pdf.cell(200, 10, txt=f"Entrada: {formatar_moeda(dados['entrada'])}", ln=1); pdf.cell(200, 10, txt=f"Valor Financiado: {formatar_moeda(dados['valor_financiado'])}", ln=1); pdf.cell(200, 10, txt=f"Taxa Mensal Utilizada: {dados['taxa_mensal']:.2f}%", ln=1)
+        pdf.ln(10); pdf.set_font("Arial", 'B', 12)
+        colunas = ["Item", "Tipo", "Data Venc.", "Valor", "Valor Presente", "Juros"]; larguras = [30, 25, 30, 35, 35, 35]
+        for col, larg in zip(colunas, larguras): pdf.cell(larg, 10, txt=col, border=1, align='C')
+        pdf.ln(); pdf.set_font("Arial", size=10)
+        cronograma_sem_total = [p for p in cronograma if p['Item'] != 'TOTAL']
+        for item in cronograma_sem_total:
+            pdf.cell(larguras[0], 8, txt=item['Item'], border=1); pdf.cell(larguras[1], 8, txt=item['Tipo'], border=1); pdf.cell(larguras[2], 8, txt=item['Data_Vencimento'], border=1)
+            pdf.cell(larguras[3], 8, txt=formatar_moeda(item['Valor'], simbolo=False), border=1, align='R'); pdf.cell(larguras[4], 8, txt=formatar_moeda(item['Valor_Presente'], simbolo=False), border=1, align='R'); pdf.cell(larguras[5], 8, txt=formatar_moeda(item['Desconto_Aplicado'], simbolo=False), border=1, align='R'); pdf.ln()
+        total = next((p for p in cronograma if p['Item'] == 'TOTAL'), None)
+        if total:
+            pdf.set_font("Arial", 'B', 10); pdf.cell(sum(larguras[:3]), 10, txt="TOTAL", border=1, align='R')
+            pdf.cell(larguras[3], 10, txt=formatar_moeda(total['Valor'], simbolo=False), border=1, align='R'); pdf.cell(larguras[4], 10, txt=formatar_moeda(total['Valor_Presente'], simbolo=False), border=1, align='R'); pdf.cell(larguras[5], 10, txt=formatar_moeda(total['Desconto_Aplicado'], simbolo=False), border=1, align='R')
+        return BytesIO(pdf.output())
+    except Exception as e: st.error(f"Erro ao gerar PDF: {str(e)}"); return BytesIO()
 
 def gerar_excel(cronograma, dados):
-    # ... (código mantido, sem alterações)
-    pass
+    try:
+        install_and_import('openpyxl'); output = BytesIO()
+        info_df = pd.DataFrame({'Campo': ['Quadra', 'Lote', 'Metragem', 'Valor Total do Imóvel', 'Entrada', 'Valor Financiado', 'Taxa Mensal Utilizada'], 'Valor': [dados.get('quadra', 'N/I'), dados.get('lote', 'N/I'), f"{dados.get('metragem', 'N/I')} m²", formatar_moeda(dados.get('valor_total', 0)), formatar_moeda(dados.get('entrada', 0)), formatar_moeda(dados.get('valor_financiado', 0)), f"{dados.get('taxa_mensal', 0):.2f}%"]})
+        df_cronograma_data = pd.DataFrame([p for p in cronograma if p['Item'] != 'TOTAL'])
+        df_cronograma_data.rename(columns={'Desconto_Aplicado': 'Juros'}, inplace=True)
+        total_row = next((p for p in cronograma if p['Item'] == 'TOTAL'), None)
+        if total_row:
+            total_row['Desconto_Aplicado'] = total_row.pop('Juros', total_row.get('Desconto_Aplicado'))
+
+        df_final = pd.concat([df_cronograma_data, pd.DataFrame([total_row])], ignore_index=True) if total_row else df_cronograma_data
+        df_export = df_final[['Item', 'Tipo', 'Data_Vencimento', 'Valor', 'Valor_Presente', 'Juros']]
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            info_df.to_excel(writer, sheet_name='Informações da Simulação', index=False)
+            df_export.to_excel(writer, sheet_name='Cronograma de Pagamentos', index=False)
+        output.seek(0); return output
+    except Exception as e: st.error(f"Erro ao gerar Excel: {str(e)}"); return BytesIO()
 
 # --- Função Principal do Aplicativo Streamlit ---
 def main():
@@ -270,7 +505,7 @@ def main():
         col2.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
     else: st.title("Simulador Imobiliária Celeste")
         
-    if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = "0.79"
+    if 'taxa_mensal' not in st.session_state: st.session_state.taxa_mensal = "0,89"
     
     def reset_form(): 
         taxa_atual = st.session_state.taxa_mensal
@@ -325,62 +560,94 @@ def main():
     
     if submitted:
         try:
-            # PARTE 1: LEITURA E VALIDAÇÃO DOS INPUTS
             valor_total = parse_currency(valor_total_str)
             entrada = parse_currency(entrada_str)
             valor_parcela = parse_currency(valor_parcela_str)
             valor_balao = parse_currency(valor_balao_str)
             taxa_mensal = parse_percentage(taxa_mensal_str)
+            
             st.session_state.taxa_mensal = taxa_mensal_str
+            
             taxa_mensal_para_calculo = taxa_mensal if not (1 <= (qtd_parcelas or 0) <= 36 and modalidade == 'mensal') else 0.0
-            if valor_total <= 0 or entrada < 0 or valor_total <= entrada: 
-                st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'.")
-                return
+            if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
-            taxas = calcular_taxas(taxa_mensal_para_calculo)
-            data_entrada = datetime.combine(data_input, datetime.min.time())
-            modo = determinar_modo_calculo(modalidade)
-            qtd_p_calc = qtd_parcelas or 0
-
-            v_p_final = 0.0
-            v_b_final = 0.0
-
-            # PARTE 2: LÓGICA DE CÁLCULO RESTAURADA E CORRIGIDA
-            if modo == 1: # Apenas Mensal
-                fator_vp_p = calcular_fator_vp([ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, qtd_p_calc + 1)], data_entrada, taxas['diaria'])
-                if fator_vp_p > 0: v_p_final = valor_financiado / fator_vp_p
+            taxas = calcular_taxas(taxa_mensal_para_calculo); modo = determinar_modo_calculo(modalidade)
+            v_p_final, v_b_final = 0.0, 0.0; v_ultima_p, v_ultimo_b = None, None
+            data_entrada = datetime.combine(data_input, datetime.min.time()); dia_vencimento = data_entrada.day
             
-            elif modo in [3, 4]: # Apenas Balões
-                taxa_periodo = taxas['anual'] if modo == 3 else taxas['semestral']
-                v_b_final = calcular_pgto(taxa_periodo, qtd_baloes, valor_financiado)
-
-            elif modo == 2: # Misto: Mensal + Balão
+            if taxa_mensal_para_calculo == 0.0:
+                if modo == 1 and qtd_parcelas > 0:
+                    vp = round(valor_financiado / qtd_parcelas, 2); dif = round((vp * qtd_parcelas) - valor_financiado, 2)
+                    v_p_final = vp; v_ultima_p = vp - dif
+                elif modo in [3, 4] and qtd_baloes > 0:
+                    vb = round(valor_financiado / qtd_baloes, 2); dif = round((vb * qtd_baloes) - valor_financiado, 2)
+                    v_b_final = vb; v_ultimo_b = vb - dif
+                elif modo == 2 and ((qtd_parcelas or 0) > 0 or qtd_baloes > 0):
+                    if valor_parcela > 0 and valor_balao == 0:
+                        v_p_final = valor_parcela
+                        vp_total_parcelas = valor_parcela * (qtd_parcelas or 0)
+                        vp_restante = valor_financiado - vp_total_parcelas
+                        if qtd_baloes > 0 and vp_restante > 0:
+                            vb = round(vp_restante / qtd_baloes, 2)
+                            dif = round((vb * qtd_baloes) - vp_restante, 2)
+                            v_b_final = vb; v_ultimo_b = vb - dif
+                        elif vp_restante < 0:
+                            st.error("O valor total das parcelas excede o valor financiado.")
+                            return
+                    elif valor_balao > 0 and valor_parcela == 0:
+                        v_b_final = valor_balao
+                        vp_total_baloes = valor_balao * qtd_baloes
+                        vp_restante = valor_financiado - vp_total_baloes
+                        if (qtd_parcelas or 0) > 0 and vp_restante > 0:
+                            vp = round(vp_restante / qtd_parcelas, 2)
+                            dif = round((vp * qtd_parcelas) - vp_restante, 2)
+                            v_p_final = vp; v_ultima_p = vp - dif
+                        elif vp_restante < 0:
+                            st.error("O valor total dos balões excede o valor financiado.")
+                            return
+                    else: st.error("No modo 'mensal + balão', informe OU o valor da parcela OU o valor do balão."); return
+            else: # Lógica para planos com juros
+                qtd_p_calc = qtd_parcelas or 0
+                
+                datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, qtd_p_calc + 1)]
+                datas_b = []
+                if "balão" in modalidade and qtd_baloes > 0:
+                    if agendamento_baloes == "Personalizado (Mês a Mês)":
+                        datas_b = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
+                    elif agendamento_baloes == "A partir do 1º Vencimento":
+                        primeira_data_b = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
+                        datas_b = [primeira_data_b]
+                        data_anterior_b = primeira_data_b
+                        for _ in range(1, qtd_baloes):
+                            proxima_data_b = ajustar_data_vencimento(data_anterior_b, tipo_balao, 1, dia_vencimento)
+                            datas_b.append(proxima_data_b)
+                            data_anterior_b = proxima_data_b
+                    else: # Padrão
+                        datas_b = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
+                
+                fator_vp_p = calcular_fator_vp(datas_p, data_entrada, taxas['diaria']) if qtd_p_calc > 0 else 0
+                fator_vp_b = calcular_fator_vp(datas_b, data_entrada, taxas['diaria']) if qtd_baloes > 0 else 0
+                
                 if valor_parcela > 0 and valor_balao == 0:
                     v_p_final = valor_parcela
-                    fator_vp_p = calcular_fator_vp([ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, qtd_p_calc + 1)], data_entrada, taxas['diaria'])
-                    vp_parcelas = v_p_final * fator_vp_p
-                    vp_baloes = valor_financiado - vp_parcelas
-                    
+                    vp_restante = max(valor_financiado - (v_p_final * fator_vp_p), 0)
                     if qtd_baloes > 0:
-                        taxa_periodo = taxas['anual'] if tipo_balao == 'anual' else taxas['semestral']
-                        v_b_final = calcular_pgto(taxa_periodo, qtd_baloes, vp_baloes)
-
+                       v_b_final = round(vp_restante / fator_vp_b, 2) if fator_vp_b > 0 else 0
                 elif valor_balao > 0 and valor_parcela == 0:
                     v_b_final = valor_balao
-                    taxa_periodo = taxas['anual'] if tipo_balao == 'anual' else taxas['semestral']
-                    vp_baloes = calcular_vp(taxa_periodo, qtd_baloes, v_b_final)
-                    vp_parcelas = valor_financiado - vp_baloes
-                    
-                    fator_vp_p = calcular_fator_vp([ajustar_data_vencimento(data_entrada, "mensal", i) for i in range(1, qtd_p_calc + 1)], data_entrada, taxas['diaria'])
-                    if fator_vp_p > 0: v_p_final = vp_parcelas / fator_vp_p
-                
-                else:
-                    st.error("No modo 'mensal + balão', informe OU o valor da parcela OU o valor do balão para o cálculo.")
-                    return
+                    vp_restante = max(valor_financiado - (v_b_final * fator_vp_b), 0)
+                    if qtd_p_calc > 0:
+                       v_p_final = round(vp_restante / fator_vp_p, 2) if fator_vp_p > 0 else 0
+                elif valor_parcela == 0 and valor_balao == 0:
+                      if modo == 1: v_p_final = round(valor_financiado / fator_vp_p, 2) if fator_vp_p > 0 else 0
+                      elif modo in [3, 4]: v_b_final = round(valor_financiado / fator_vp_b, 2) if fator_vp_b > 0 else 0
+                      else: st.error("Para cálculo automático em modo misto, preencha o valor da Parcela ou do Balão."); return
+                else: # Ambos os valores foram preenchidos
+                    v_p_final = valor_parcela
+                    v_b_final = valor_balao
 
-            # PARTE 3: GERAÇÃO DO CRONOGRAMA E EXIBIÇÃO
-            cronograma = gerar_cronograma(valor_financiado, round(v_p_final, 2), round(v_b_final, 2), qtd_p_calc, qtd_baloes, modalidade, tipo_balao, data_entrada, taxas, agendamento_baloes=agendamento_baloes, meses_baloes=meses_baloes, mes_primeiro_balao=mes_primeiro_balao)
+            cronograma = gerar_cronograma(valor_financiado, v_p_final, v_b_final, (qtd_parcelas or 0), qtd_baloes, modalidade, tipo_balao, data_entrada, taxas, valor_ultima_parcela=v_ultima_p, valor_ultimo_balao=v_ultimo_b, agendamento_baloes=agendamento_baloes, meses_baloes=meses_baloes, mes_primeiro_balao=mes_primeiro_balao)
             
             st.subheader("Resultados da Simulação")
             c1, c2, c3, c4 = st.columns(4)
@@ -402,8 +669,8 @@ def main():
                     st.subheader("Exportar Resultados")
                     export_data = {'valor_total': valor_total, 'entrada': entrada, 'taxa_mensal': taxa_mensal_para_calculo, 'valor_financiado': valor_financiado, 'quadra': quadra, 'lote': lote, 'metragem': metragem}
                     c1_exp, c2_exp = st.columns(2)
-                    pdf_file = gerar_pdf(cronograma, export_data); c1_exp.download_button("Exportar para PDF", pdf_file, "simulacao.pdf", "application/pdf", use_container_width=True)
-                    excel_file = gerar_excel(cronograma, export_data); c2_exp.download_button("Exportar para Excel", excel_file, "simulacao.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                    pdf_file = gerar_pdf(cronograma, export_data); c1_exp.download_button("Exportar para PDF", pdf_file, "simulacao.pdf", "application/pdf")
+                    excel_file = gerar_excel(cronograma, export_data); c2_exp.download_button("Exportar para Excel", excel_file, "simulacao.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         except Exception as e:
             st.error(f"Ocorreu um erro durante a simulação: {str(e)}. Por favor, verifique os valores inseridos e tente novamente.")
 
