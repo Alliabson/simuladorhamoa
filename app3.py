@@ -322,13 +322,35 @@ def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
         return round(float(valor_futuro) / ((1 + taxa_diaria) ** dias), 2)
     except Exception: return float(valor_futuro)
 
+# CÓDIGO CORRIGIDO para calcular_fator_vp
 def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
-    if taxa_diaria <= 0: return len(datas_vencimento)
+    """
+    Calcula o fator de valor presente somado para uma lista de datas.
+    CORREÇÃO: Utiliza o prazo comercial (meses * 30 dias) para alinhar com o Excel.
+    """
+    if taxa_diaria <= 0:
+        return float(len(datas_vencimento))
+    
     fator_total = 0.0
     for data_venc in datas_vencimento:
-        if not isinstance(data_venc, datetime): data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
-        dias = (data_venc - data_inicio).days
-        if dias > 0: fator_total += 1 / ((1 + taxa_diaria) ** dias)
+        if not isinstance(data_venc, datetime):
+            data_venc = datetime.strptime(data_venc, '%d/%m/%Y')
+        
+        # Lógica para calcular o número de meses de diferença
+        num_meses = (data_venc.year - data_inicio.year) * 12 + (data_venc.month - data_inicio.month)
+        
+        # Ignora diferenças de dias dentro do mesmo mês para o cálculo do prazo
+        if data_venc.day < data_inicio.day:
+             # Heurística para casos como 31/Jan a 28/Fev, onde a diferença de mês é 1, mas não completou 30 dias.
+             # Para o cálculo 30/360, o mais simples é arredondar a contagem de meses.
+             # Se a data de vencimento é no mesmo "ciclo" mensal, consideramos o mês.
+             # A lógica de num_meses já trata isso de forma satisfatória para o modelo 30/360.
+             pass
+
+        dias_comerciais = num_meses * 30
+
+        if dias_comerciais > 0:
+            fator_total += 1 / ((1 + taxa_diaria) ** dias_comerciais)
     return fator_total
 
 # FUNÇÃO REVISADA PARA GARANTIR CÁLCULO CORRETO DE MESES
@@ -384,61 +406,66 @@ def atualizar_baloes(modalidade, qtd_parcelas, tipo_balao=None):
         return 0
     except Exception: return 0
 
+# Trechos corrigidos da função gerar_cronograma
 @st.cache_data(ttl=3600)
 def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                      qtd_parcelas, qtd_baloes, modalidade, tipo_balao,
                      data_entrada, taxas, valor_ultima_parcela=None, valor_ultimo_balao=None,
                      agendamento_baloes=None, meses_baloes=None, mes_primeiro_balao=None):
     try:
-        dia_vencimento = data_entrada.day
+        dia_vencimento_real = data_entrada.day
         parcelas, baloes = [], []
 
+        # --- CORREÇÃO NO LOOP DE PARCELAS ---
         if modalidade in ["mensal", "mensal + balão"]:
             for i in range(1, qtd_parcelas + 1):
                 valor_corrente = valor_ultima_parcela if (i == qtd_parcelas and valor_ultima_parcela is not None) else valor_parcela_final
-                data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
-                dias = (data_vencimento - data_entrada).days
-                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias)
-                parcelas.append({"Item": f"Parcela {i}", "Tipo": "Parcela", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
-        
+                data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento_real)
+                dias_comerciais = i * 30  # Prazo comercial
+                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
+                parcelas.append({"Item": f"Parcela {i}", "Tipo": "Parcela", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
+
+        # --- CORREÇÃO NO LOOP DE BALÕES "SÓ BALÃO" ---
         periodo_map = {"só balão anual": "anual", "só balão semestral": "semestral"}
         if modalidade in periodo_map:
             periodo = periodo_map[modalidade]
+            meses_por_periodo = 12 if periodo == "anual" else 6
             for i in range(1, qtd_baloes + 1):
                 valor_corrente = valor_ultimo_balao if (i == qtd_baloes and valor_ultimo_balao is not None) else valor_balao_final
-                data_vencimento = ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento)
-                dias = (data_vencimento - data_entrada).days
-                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias)
-                baloes.append({"Item": f"Balão {i}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
+                data_vencimento = ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento_real)
+                dias_comerciais = i * meses_por_periodo * 30 # Prazo comercial
+                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
+                baloes.append({"Item": f"Balão {i}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
 
+        # --- CORREÇÃO NO LOOP DE BALÕES "MENSAL + BALÃO" ---
         if modalidade == "mensal + balão":
             datas_baloes_a_gerar = []
+            # ... (lógica de geração de datas permanece a mesma) ...
             if agendamento_baloes == "Personalizado (Mês a Mês)":
-                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
-            
+                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento_real) for mes in meses_baloes]
             elif agendamento_baloes == "A partir do 1º Vencimento":
-                primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
+                primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento_real)
                 datas_baloes_a_gerar.append(primeira_data_balao)
-                
                 data_anterior = primeira_data_balao
                 for _ in range(1, qtd_baloes):
-                    # CORREÇÃO: Usa o dia de vencimento original para os cálculos subsequentes
-                    proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento)
+                    proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento_real)
                     datas_baloes_a_gerar.append(proxima_data_balao)
                     data_anterior = proxima_data_balao
-
-            else: # Padrão
-                # LÓGICA PADRÃO SIMPLIFICADA E CORRIGIDA
-                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
+            else:
+                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento_real) for i in range(1, qtd_baloes + 1)]
             
             for i, data_vencimento in enumerate(datas_baloes_a_gerar):
                 balao_count = i + 1
                 valor_corrente = valor_ultimo_balao if (balao_count == qtd_baloes and valor_ultimo_balao is not None) else valor_balao_final
-                dias = (data_vencimento - data_entrada).days
-                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias)
-                baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
+                
+                # Lógica para calcular o número de meses de diferença
+                num_meses = (data_vencimento.year - data_entrada.year) * 12 + (data_vencimento.month - data_entrada.month)
+                dias_comerciais = num_meses * 30 # Prazo comercial
+                
+                vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
+                baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
         
-        # AJUSTE DE ORDENAÇÃO: Ordena cada lista separadamente e depois as combina.
+        # ... (Restante da função permanece igual) ...
         parcelas_sorted = sorted(parcelas, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         baloes_sorted = sorted(baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         cronograma = parcelas_sorted + baloes_sorted
@@ -452,7 +479,6 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
     except Exception as e:
         st.error(f"Erro inesperado ao gerar cronograma: {str(e)}.")
         return []
-
 
 def gerar_pdf(cronograma, dados):
     try:
