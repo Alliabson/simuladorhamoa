@@ -592,10 +592,12 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total",
-                                          help="Digite o valor sem pontos para milhares. Use a vírgula para separar os centavos. Ex: 150000,50")
-            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada",
-                                      help="Digite o valor sem pontos para milhares. Use a vírgula para separar os centavos. Ex: 50000,00")
+            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total")
+            st.caption("Digite o valor sem pontos. Use a vírgula para centavos. Ex: 150000,50")
+            
+            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada")
+            st.caption("Digite o valor sem pontos. Use a vírgula para centavos. Ex: 50000,00")
+
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
             taxa_mensal_exibicao = st.number_input("Taxa de Juros Mensal Máxima (%)", value=st.session_state.taxa_mensal, step=0.01, format="%.2f", disabled=True)
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
@@ -616,15 +618,13 @@ def main():
                 qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: {qtd_baloes}")
             
-            valor_parcela = st.number_input("Valor da Parcela (R$)", 
-                                            help="No modo 'mensal + balão', informe este valor para que o sistema calcule o balão. Nos outros modos, deixe 0. Use vírgula para centavos.", 
-                                            min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
+            valor_parcela = st.number_input("Valor da Parcela (R$)", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
+            st.caption("No modo 'mensal + balão', informe este valor para o cálculo do balão.")
             
             valor_balao = 0.0
             if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", 
-                                              help="No modo 'mensal + balão', informe este valor para que o sistema calcule a parcela. Use vírgula para centavos.", 
-                                              min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
+                valor_balao = st.number_input("Valor do Balão (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
+                st.caption("No modo 'mensal + balão', informe este valor para o cálculo da parcela.")
         
         col_b1, col_b2, _ = st.columns([1, 1, 4])
         submitted = col_b1.form_submit_button("Calcular")
