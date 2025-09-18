@@ -605,7 +605,7 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
         
         with col2:
-            qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, max_value=180, step=1, key="qtd_parcelas")
+            qtd_parcelas = st.number_input("Quantidade de Parcelas/Meses", min_value=0, max_value=180, step=1, key="qtd_parcelas")
             
             if qtd_parcelas > 180: st.warning("A quantidade máxima de parcelas permitida é 180.")
 
