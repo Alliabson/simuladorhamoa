@@ -375,8 +375,6 @@ def atualizar_baloes(modalidade, qtd_parcelas, tipo_balao=None):
         return 0
     except Exception: return 0
 
-# --- ATUALIZAÇÃO ---
-# A função agora aceita um dicionário de balões especiais para valores customizados.
 @st.cache_data(ttl=3600)
 def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
                      qtd_parcelas, qtd_baloes, modalidade, tipo_balao,
@@ -420,7 +418,6 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
 
         for i, data_vencimento in enumerate(datas_baloes_a_gerar):
             balao_count = i + 1
-            # --- ATUALIZAÇÃO ---
             # Verifica se é um balão especial, senão usa o valor padrão
             if balao_count in baloes_especiais:
                 valor_corrente = baloes_especiais[balao_count]
@@ -432,8 +429,13 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
             baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
 
-        # Consolidação e Totalização
-        cronograma = sorted(parcelas + baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
+        # --- ATUALIZAÇÃO ---
+        # # Consolidação e Totalização (Retornando à lógica original)
+        # Ordena as parcelas e os balões em listas separadas e depois as junta.
+        parcelas_sorted = sorted(parcelas, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
+        baloes_sorted = sorted(baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
+        cronograma = parcelas_sorted + baloes_sorted
+
         if cronograma:
             total_valor = round(sum(p['Valor'] for p in cronograma), 2)
             valor_presente_real = round(sum(p['Valor_Presente'] for p in cronograma), 2)
@@ -532,7 +534,6 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
 
         with col2:
-            # --- ATUALIZAÇÃO ---
             # Lógica de input condicional para parcelas ou balões
             qtd_parcelas, qtd_baloes = 0, 0
             if modalidade.startswith("só balão"):
@@ -555,7 +556,6 @@ def main():
             baloes_especiais_input = {}
             if "balão" in modalidade:
                 valor_balao_str = st.text_input("Valor Padrão do Balão (R$)", key="valor_balao_str", placeholder="Deixe em branco para cálculo")
-                # --- ATUALIZAÇÃO ---
                 # Seção para inserir balões com valores customizados
                 with st.expander("Adicionar Balões com Valores Diferentes (Opcional)"):
                     num_especiais = st.number_input("Quantos balões terão valor especial?", min_value=0, max_value=4, step=1, key="num_baloes_especiais")
@@ -616,7 +616,7 @@ def main():
                         if qtd_parcelas > 0: v_p_final = valor_uniforme
                         if num_baloes_regulares > 0: v_b_final = valor_uniforme
             
-            else: # --- ATUALIZAÇÃO --- Lógica para planos com juros e balões especiais
+            else: # Lógica para planos com juros e balões especiais
                 # 1. Definir todas as datas de vencimento
                 datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, (qtd_parcelas or 0) + 1)]
                 datas_b_todas = []
