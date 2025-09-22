@@ -199,7 +199,13 @@ def set_theme():
         /* Subtítulos das seções */
         .stSubheader,
         /* Botões de exportação (labels) */
-        .stDownloadButton label {
+        .stDownloadButton label,
+        /* --- ATUALIZAÇÃO --- */
+        /* Título do expander */
+        .streamlit-expander header p,
+        /* Labels dos inputs dentro do expander */
+        .streamlit-expander [data-testid="stNumberInput"] label,
+        .streamlit-expander [data-testid="stTextInput"] label {
             color: #FFFFFF !important;
         }
         
@@ -429,8 +435,7 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
             baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
 
-        # --- ATUALIZAÇÃO ---
-        # # Consolidação e Totalização (Retornando à lógica original)
+        # Consolidação e Totalização (Retornando à lógica original)
         # Ordena as parcelas e os balões em listas separadas e depois as junta.
         parcelas_sorted = sorted(parcelas, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         baloes_sorted = sorted(baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
