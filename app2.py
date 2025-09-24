@@ -397,24 +397,19 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
 
         # Geração de Balões
         datas_baloes_a_gerar = []
-        if "balão" in modalidade:
-            if modalidade == "mensal + balão":
-                if agendamento_baloes == "Personalizado (Mês a Mês)":
-                    datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento_real) for mes in meses_baloes]
-                elif agendamento_baloes == "A partir do 1º Vencimento":
-                    primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento_real)
-                    datas_baloes_a_gerar.append(primeira_data_balao)
-                    data_anterior = primeira_data_balao
-                    for _ in range(1, qtd_baloes):
-                        proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento_real)
-                        datas_baloes_a_gerar.append(proxima_data_balao)
-                        data_anterior = proxima_data_balao
-                else: # Padrão
-                    datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento_real) for i in range(1, qtd_baloes + 1)]
-            else: # "só balão"
-                periodo_map = {"só balão anual": "anual", "só balão semestral": "semestral"}
-                periodo = periodo_map[modalidade]
-                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, periodo, i, dia_vencimento_real) for i in range(1, qtd_baloes + 1)]
+        if "balão" in modalidade and qtd_baloes > 0:
+            if agendamento_baloes == "Personalizado (Mês a Mês)":
+                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento_real) for mes in meses_baloes]
+            elif agendamento_baloes == "A partir do 1º Vencimento":
+                primeira_data_balao = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento_real)
+                datas_baloes_a_gerar.append(primeira_data_balao)
+                data_anterior = primeira_data_balao
+                for _ in range(1, qtd_baloes):
+                    proxima_data_balao = ajustar_data_vencimento(data_anterior, tipo_balao, 1, dia_vencimento_real)
+                    datas_baloes_a_gerar.append(proxima_data_balao)
+                    data_anterior = proxima_data_balao
+            else: # Padrão
+                datas_baloes_a_gerar = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento_real) for i in range(1, qtd_baloes + 1)]
 
         for i, data_vencimento in enumerate(datas_baloes_a_gerar):
             balao_count = i + 1
@@ -429,9 +424,7 @@ def gerar_cronograma(valor_financiado, valor_parcela_final, valor_balao_final,
             vp = calcular_valor_presente(valor_corrente, taxas['diaria'], dias_comerciais)
             baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_corrente, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_corrente - vp, 2)})
 
-        # --- ATUALIZAÇÃO ---
-        # # Consolidação e Totalização (Retornando à lógica original)
-        # Ordena as parcelas e os balões em listas separadas e depois as junta.
+        # Consolidação e Totalização
         parcelas_sorted = sorted(parcelas, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         baloes_sorted = sorted(baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
         cronograma = parcelas_sorted + baloes_sorted
@@ -517,46 +510,57 @@ def main():
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
             taxa_mensal_str = st.text_input("Taxa de Juros Mensal (%)", value=st.session_state.taxa_mensal, key="taxa_mensal_str", placeholder="Ex: 0,89")
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
+            
             tipo_balao, agendamento_baloes, meses_baloes, mes_primeiro_balao = None, "Padrão", [], 12
-            if modalidade == "mensal + balão": 
-                tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao")
+            
+            # --- Lógica de Agendamento de Balões (Unificada) ---
+            if "balão" in modalidade: 
+                if modalidade == "mensal + balão":
+                    tipo_balao = st.selectbox("Período Padrão do Balão:", ["anual", "semestral"], key="tipo_balao")
+                elif "anual" in modalidade:
+                    tipo_balao = "anual"
+                elif "semestral" in modalidade:
+                    tipo_balao = "semestral"
+
                 agendamento_baloes = st.selectbox("Agendamento dos Balões", ["Padrão", "A partir do 1º Vencimento", "Personalizado (Mês a Mês)"], key="agendamento_baloes")
                 
-                max_parcelas_seguro = int(st.session_state.get("qtd_parcelas", 1) or 1)
+                max_meses_plano = 360 # Limite de 30 anos para seleção
                 
                 if agendamento_baloes == "Personalizado (Mês a Mês)":
-                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=list(range(1, max_parcelas_seguro + 1)), key="meses_baloes")
+                    opcoes_meses = list(range(1, max_meses_plano + 1))
+                    meses_baloes = st.multiselect("Selecione os meses dos balões:", options=opcoes_meses, key="meses_baloes")
                 elif agendamento_baloes == "A partir do 1º Vencimento":
                     valor_padrao_mes = (12 if tipo_balao == 'anual' else 6)
-                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_parcelas_seguro, value=valor_padrao_mes, step=1, key="mes_primeiro_balao")
-            
-            elif "anual" in modalidade: tipo_balao = "anual"
-            elif "semestral" in modalidade: tipo_balao = "semestral"
+                    mes_primeiro_balao = st.number_input("Mês de Vencimento do 1º Balão", min_value=1, max_value=max_meses_plano, value=valor_padrao_mes, step=1, key="mes_primeiro_balao")
 
         with col2:
-            # Lógica de input condicional para parcelas ou balões
+            # --- Lógica de Quantidade de Parcelas e Balões ---
             qtd_parcelas, qtd_baloes = 0, 0
-            if modalidade.startswith("só balão"):
-                qtd_parcelas = 0
-                qtd_baloes = st.number_input("Quantidade de Balões", min_value=0, step=1, key="qtd_baloes_direto", placeholder="Ex: 4")
-            else: # mensal ou mensal + balão
+            
+            if not modalidade.startswith("só balão"):
                 qtd_parcelas = st.number_input("Quantidade de Parcelas", min_value=0, step=1, key="qtd_parcelas", placeholder="Ex: 180")
-                if "balão" in modalidade:
-                    if agendamento_baloes == "Personalizado (Mês a Mês)": 
-                        qtd_baloes = len(meses_baloes)
-                    else: 
-                        qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
+
+            if "balão" in modalidade:
+                if agendamento_baloes == "Personalizado (Mês a Mês)":
+                    qtd_baloes = len(meses_baloes)
+                    st.write(f"Quantidade de Balões: **{qtd_baloes}** (definido pela seleção)")
+                    # Adiciona um campo desabilitado no modo "só balão" para consistência de layout
+                    if modalidade.startswith("só balão"):
+                        st.number_input("Quantidade de Balões", value=qtd_baloes, disabled=True, key="qtd_baloes_direto_disabled")
+                elif modalidade.startswith("só balão"):
+                    qtd_baloes = st.number_input("Quantidade de Balões", min_value=0, step=1, key="qtd_baloes_direto", placeholder="Ex: 4")
+                else: # "mensal + balão" com agendamento Padrão ou A partir do 1º Venc.
+                    qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                     st.write(f"Quantidade de Balões: **{qtd_baloes}**")
 
             valor_parcela_str = ""
-            if modalidade != "só balão anual" and modalidade != "só balão semestral":
+            if not modalidade.startswith("só balão"):
                 valor_parcela_str = st.text_input("Valor da Parcela (R$)", key="valor_parcela_str", placeholder="Deixe em branco para cálculo")
 
             valor_balao_str = ""
             baloes_especiais_input = {}
             if "balão" in modalidade:
                 valor_balao_str = st.text_input("Valor Padrão do Balão (R$)", key="valor_balao_str", placeholder="Deixe em branco para cálculo")
-                # Seção para inserir balões com valores customizados
                 with st.expander("Adicionar Balões com Valores Diferentes (Opcional)"):
                     num_especiais = st.number_input("Quantos balões terão valor especial?", min_value=0, max_value=4, step=1, key="num_baloes_especiais")
                     for i in range(num_especiais):
@@ -621,18 +625,15 @@ def main():
                 datas_p = [ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento) for i in range(1, (qtd_parcelas or 0) + 1)]
                 datas_b_todas = []
                 if "balão" in modalidade and qtd_baloes > 0:
-                    if modalidade == "mensal + balão":
-                        if agendamento_baloes == "Personalizado (Mês a Mês)":
-                            datas_b_todas = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
-                        elif agendamento_baloes == "A partir do 1º Vencimento":
-                            dt = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
+                    if agendamento_baloes == "Personalizado (Mês a Mês)":
+                        datas_b_todas = [ajustar_data_vencimento(data_entrada, "mensal", mes, dia_vencimento) for mes in meses_baloes]
+                    elif agendamento_baloes == "A partir do 1º Vencimento":
+                        dt = ajustar_data_vencimento(data_entrada, "mensal", mes_primeiro_balao, dia_vencimento)
+                        datas_b_todas.append(dt)
+                        for _ in range(1, qtd_baloes):
+                            dt = ajustar_data_vencimento(dt, tipo_balao, 1, dia_vencimento)
                             datas_b_todas.append(dt)
-                            for _ in range(1, qtd_baloes):
-                                dt = ajustar_data_vencimento(dt, tipo_balao, 1, dia_vencimento)
-                                datas_b_todas.append(dt)
-                        else: # Padrão
-                            datas_b_todas = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
-                    else: # "só balão"
+                    else: # Padrão
                         datas_b_todas = [ajustar_data_vencimento(data_entrada, tipo_balao, i, dia_vencimento) for i in range(1, qtd_baloes + 1)]
 
                 # 2. Calcular VP dos balões com valor fixo (especiais)
