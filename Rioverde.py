@@ -631,9 +631,9 @@ def main():
         try:
             # --- INÍCIO DA MODIFICAÇÃO (Rio Verde) ---
             # Lógica de taxa para Rio Verde
-            if 1 <= qtd_parcelas <= 47: 
+            if 1 <= qtd_parcelas <= 36: 
                 taxa_mensal_para_calculo = 0.0
-            elif 48 <= qtd_parcelas <= 144:
+            elif 37 <= qtd_parcelas <= 144:
                 taxa_mensal_para_calculo = 0.79
             else: # Cobre < 1 
                 taxa_mensal_para_calculo = 0.0
@@ -735,7 +735,7 @@ def main():
                 for col in ['Valor', 'Valor_Presente', 'Desconto_Aplicado']:
                     df_display[col] = df_display[col].apply(lambda x: formatar_moeda(x, simbolo=True))
 
-                st.dataframe(df_display, use_container_width=True, hide_index=True, column_config={"Data_Vencimento": "Data Venc."})
+                st.dataframe(df_display, use_container_width=True, hide_index=True, column_config={"Data_Vencimento": "Data Vc."})
 
                 total = next((p for p in cronograma if p['Item'] == 'TOTAL'), None)
                 if total:
