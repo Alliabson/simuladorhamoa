@@ -1,3 +1,4 @@
+# Hamoa Jataí.py
 import streamlit as st
 from datetime import datetime, timedelta
 from PIL import Image
@@ -572,7 +573,7 @@ def main():
         with col1:
             st.image(logo, width=200, use_container_width=False)
         with col2:
-            st.title("**Seja bem vindo ao Simulador da JMD HAMOA**")
+            st.title("**Seja bem vindo ao Simulador da JMD HAMOA (Jataí)**")
     else:
         st.title("Simulador Imobiliária Celeste")
         
@@ -605,9 +606,11 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
         
         with col2:
+            # --- INÍCIO DA MODIFICAÇÃO (Hamoa Jataí) ---
             qtd_parcelas = st.number_input("Qtd. de Parcelas/Meses:Plano só balões 48 meses = 4 balões anual; 8 balões semestrais", min_value=0, max_value=180, step=1, key="qtd_parcelas")
             
             if qtd_parcelas > 180: st.warning("A quantidade máxima de parcelas permitida é 180.")
+            # --- FIM DA MODIFICAÇÃO ---
 
             qtd_baloes = 0
             if "balão" in modalidade:
@@ -626,14 +629,14 @@ def main():
     
     if submitted:
         try:
-            # --- INÍCIO DA MODIFICAÇÃO (Rio Verde) ---
-            # Lógica de taxa para Rio Verde
-            if 1 <= qtd_parcelas <= 47: # Combina 1-36 (0%) e a faixa 37-47 (antiga 0.395% removida)
+            # --- INÍCIO DA MODIFICAÇÃO (Hamoa Jataí) ---
+            # Lógica de taxa para Hamoa Jataí (Juros a partir de 37 meses)
+            if 1 <= qtd_parcelas <= 36: 
                 taxa_mensal_para_calculo = 0.0
-            elif 48 <= qtd_parcelas <= 144: # Regra explícita de 48-144 meses
+            elif 37 <= qtd_parcelas <= 180:
                 taxa_mensal_para_calculo = 0.79
-            else: # Cobre 145-180 (e < 1), assume 0.79% como fallback
-                taxa_mensal_para_calculo = 0.79
+            else: # Cobre < 1 
+                taxa_mensal_para_calculo = 0.0
             # --- FIM DA MODIFICAÇÃO ---
 
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada:
