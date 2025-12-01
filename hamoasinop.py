@@ -636,7 +636,7 @@ def main():
             if 1 <= qtd_parcelas <= 36:
                 taxa_mensal_para_calculo = 0.0
             elif 37 <= qtd_parcelas <= 48:
-                taxa_mensal_para_calculo = 0.39
+                taxa_mensal_para_calculo = 0.395
             elif 49 <= qtd_parcelas <= 60:
                 taxa_mensal_para_calculo = 0.59
             elif 61 <= qtd_parcelas <= 156:
