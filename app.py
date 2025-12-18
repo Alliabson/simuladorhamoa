@@ -7,7 +7,7 @@ from io import BytesIO
 import os
 import subprocess
 import sys
-import re
+import re  # Importante para o parse_currency
 
 # --- Configuração de Locale ---
 def configure_locale():
@@ -256,6 +256,21 @@ def set_theme():
     """, unsafe_allow_html=True)
 
 # --- Funções de Cálculo Financeiro ---
+
+def parse_currency(value_str: str) -> float:
+    """
+    Converte uma string de valor monetário (ex: 'R$ 1.500,00') para float (1500.00).
+    """
+    if not isinstance(value_str, str) or not value_str.strip():
+        return 0.0
+    try:
+        # Remove R$, espaços e pontos de milhar
+        cleaned_value = re.sub(r'[R$\s\.]', '', value_str.strip())
+        # Substitui vírgula decimal por ponto
+        cleaned_value = cleaned_value.replace(',', '.')
+        return float(cleaned_value)
+    except (ValueError, TypeError):
+        return 0.0
 
 def formatar_moeda(valor, simbolo=True):
     try:
@@ -592,8 +607,10 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            valor_total = st.number_input("Valor Total do Imóvel (R$)", min_value=0.0, step=1000.0, format="%.2f", key="valor_total")
-            entrada = st.number_input("Entrada (R$)", min_value=0.0, step=1000.0, format="%.2f", key="entrada")
+            # --- INPUTS ALTERADOS PARA TEXTO (COM PARSE_CURRENCY) ---
+            valor_total_str = st.text_input("Valor Total do Imóvel (R$)", key="valor_total_str", placeholder="Ex: 250.000,00")
+            entrada_str = st.text_input("Entrada (R$)", key="entrada_str", placeholder="Ex: 50.000,00")
+            
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
             taxa_mensal_exibicao = st.number_input("Taxa de Juros Mensal Máxima (%)", value=st.session_state.taxa_mensal, step=0.01, format="%.2f", disabled=True)
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
@@ -605,20 +622,21 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
         
         with col2:
-            qtd_parcelas = st.number_input("Qtd. de Parcelas/Meses:Plano só balões 48 meses = 4 balões anual; 8 balões semestrais", min_value=0, max_value=180, step=1, key="qtd_parcelas")
+            # --- LIMITADO A 176 PARCELAS ---
+            qtd_parcelas = st.number_input("Qtd. de Parcelas/Meses (Balões anuais até 15)", min_value=0, max_value=176, step=1, key="qtd_parcelas")
             
-            if qtd_parcelas > 180: st.warning("A quantidade máxima de parcelas permitida é 180.")
+            if qtd_parcelas > 176: st.warning("A quantidade máxima de parcelas permitida é 176.")
 
             qtd_baloes = 0
             if "balão" in modalidade:
                 qtd_baloes = atualizar_baloes(modalidade, qtd_parcelas, tipo_balao)
                 st.write(f"Quantidade de Balões: {qtd_baloes}")
             
-            valor_parcela = st.number_input("Valor da Parcela (R$) (**No plano mensal, só balão anual e só balão semestral deixe 0, No plano mensal+balão digite o valor**)", help="Para 'mensal + balão', se este valor for informado, o sistema calculará o balão.", min_value=0.0, step=100.0, format="%.2f", key="valor_parcela")
-            
-            valor_balao = 0.0
-            if "balão" in modalidade:
-                valor_balao = st.number_input("Valor do Balão (R$)", help="Para 'mensal + balão', se este valor for informado, o sistema calculará a parcela.", min_value=0.0, step=1000.0, format="%.2f", key="valor_balao")
+            # --- INPUTS ALTERADOS PARA TEXTO (COM PARSE_CURRENCY) ---
+            valor_parcela_str = st.text_input("Valor da Parcela (R$)", key="valor_parcela_str", placeholder="No plano mensal + balão, digite o valor se quiser fixar a parcela.")
+            st.caption("Deixe 0 ou vazio se não se aplicar ou para o sistema calcular.")
+
+            valor_balao_str = st.text_input("Valor do Balão (R$)", key="valor_balao_str", placeholder="No plano mensal + balão, digite o valor se quiser fixar o balão.")
         
         col_b1, col_b2, _ = st.columns([1, 1, 4])
         submitted = col_b1.form_submit_button("Calcular")
@@ -626,11 +644,18 @@ def main():
     
     if submitted:
         try:
+            # --- CONVERSÃO DAS STRINGS PARA FLOAT ---
+            valor_total = parse_currency(valor_total_str)
+            entrada = parse_currency(entrada_str)
+            valor_parcela = parse_currency(valor_parcela_str)
+            valor_balao = parse_currency(valor_balao_str)
+
+            # --- LÓGICA DE FAIXAS DE JUROS (MANTIDA ORIGINAL MAS COM TETO 176) ---
             if 1 <= qtd_parcelas <= 36:
                 taxa_mensal_para_calculo = 0.0
             elif 37 <= qtd_parcelas <= 48:
                 taxa_mensal_para_calculo = 0.395
-            elif 49 <= qtd_parcelas <= 180:
+            elif 49 <= qtd_parcelas <= 176: # Ajustado para 176 conforme pedido
                 taxa_mensal_para_calculo = 0.79
             else: 
                 taxa_mensal_para_calculo = 0.79 
@@ -697,8 +722,10 @@ def main():
                     datas_p = [ajustar_data_vencimento(data_entrada_dt, "mensal", i, dia_vencimento) for i in range(1, qtd_parcelas + 1)]
                     intervalo_balao = 12 if tipo_balao == 'anual' else 6
                     datas_b = [ajustar_data_vencimento(data_entrada_dt, "mensal", i, dia_vencimento) for i in range(intervalo_balao, qtd_parcelas + 1, intervalo_balao)]
+                    
                     fator_vp_p = calcular_fator_vp(datas_p, data_entrada_dt, taxas['diaria'])
                     fator_vp_b = calcular_fator_vp(datas_b, data_entrada_dt, taxas['diaria'])
+                    
                     if valor_parcela > 0 and valor_balao == 0:
                         valor_parcela_final = valor_parcela
                         vp_das_parcelas = valor_parcela_final * fator_vp_p
