@@ -586,7 +586,9 @@ def main():
             
             st.session_state.taxa_mensal = taxa_mensal_str
             
-            taxa_mensal_para_calculo = taxa_mensal if not (1 <= (qtd_parcelas or 0) <= 36 and modalidade == 'mensal') else 0.0
+            # ATUALIZAÇÃO: Removida a regra que forçava juros a 0% até 36 meses.
+            taxa_mensal_para_calculo = taxa_mensal
+            
             if valor_total <= 0 or entrada < 0 or valor_total <= entrada: st.error("Verifique os valores de 'Total do Imóvel' e 'Entrada'."); return
             
             valor_financiado = round(max(valor_total - entrada, 0), 2)
