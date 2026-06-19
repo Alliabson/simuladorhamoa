@@ -157,7 +157,7 @@ def pre_calcular_fatores(data_base_str):
         }
     return fatores_planos
 
-# --- GERAÇÃO DAS TABELAS SEPARADAS COM SEU NOVO CABEÇALHO ---
+# --- GERAÇÃO DAS TABELAS SEPARADAS ---
 def gerar_tabelas_por_plano(df_lotes, data_base):
     fatores = pre_calcular_fatores(data_base.strftime("%Y-%m-%d"))
     dicionario_tabelas = {}
@@ -197,7 +197,6 @@ def gerar_tabelas_por_plano(df_lotes, data_base):
             valor_parcela = (vp_parcelas / fat['f_vp_p']) if (fat['qtd_p'] > 0 and fat['f_vp_p'] > 0) else 0
             valor_balao = (vp_baloes / fat['f_vp_b']) if (fat['qtd_b'] > 0 and fat['f_vp_b'] > 0) else 0
 
-            # SEU NOVO CABEÇALHO MODELADO EXATAMENTE IGUAL AO SEU PRINT
             linha = {
                 'Quadra': lote['Quadra'],
                 'Lote': lote['Lote'],
@@ -241,7 +240,12 @@ def main():
         st.markdown("<p class='upload-text'>2. Data de Início Base</p>", unsafe_allow_html=True)
         data_base = st.date_input("", value=datetime.now(), format="DD/MM/YYYY")
 
+    # Limpa a memória se subir um arquivo novo para evitar conflitos
     if uploaded_file is not None:
+        if 'last_uploaded' not in st.session_state or st.session_state['last_uploaded'] != uploaded_file.name:
+            st.session_state['last_uploaded'] = uploaded_file.name
+            st.session_state.pop('dicionario_tabelas', None)
+
         try:
             if uploaded_file.name.endswith('.csv'): df_lotes = pd.read_csv(uploaded_file)
             else: df_lotes = pd.read_excel(uploaded_file)
@@ -251,11 +255,15 @@ def main():
             
             st.success(f"Planilha carregada com sucesso! {len(df_lotes)} lotes encontrados.")
             
+            # Botão de Ação: Ao clicar, processa e joga na memória (session_state)
             if st.button("🚀 Gerar e Organizar Tabelas com Novo Cabeçalho"):
                 data_calculo = datetime.combine(data_base, datetime.min.time())
-                
                 with st.spinner("Construindo as abas estruturadas..."):
-                    dicionario_tabelas = gerar_tabelas_por_plano(df_lotes, data_calculo)
+                    st.session_state['dicionario_tabelas'] = gerar_tabelas_por_plano(df_lotes, data_calculo)
+            
+            # SE A TABELA EXISTIR NA MEMÓRIA, MOSTRA O RESTO DA TELA!
+            if 'dicionario_tabelas' in st.session_state:
+                dicionario_tabelas = st.session_state['dicionario_tabelas']
                 
                 st.subheader("👀 Pré-visualização da Tabela por Aba")
                 abas_disponiveis = list(dicionario_tabelas.keys())
@@ -263,7 +271,6 @@ def main():
                 
                 df_preview = dicionario_tabelas[aba_selecionada]
                 
-                # Formata os números apenas para a exibição na tela do app
                 colunas_dinamicas_moeda = [
                     'Valor do M²', 'Valor à Vista', 'Entrada Comercial (A Vista)', 
                     'Sinal 3x', 'Saldo Financiado', 'Valor da Parcela', 'Valor do Balão'
@@ -276,7 +283,7 @@ def main():
                 
                 st.dataframe(df_preview, use_container_width=True, hide_index=True, column_config=config_colunas, height=400)
                 
-                # --- Exportador Executivo Excel ---
+                # Prepara o arquivo para baixar
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     for nome_aba, df_plan in dicionario_tabelas.items():
