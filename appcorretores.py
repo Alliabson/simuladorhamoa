@@ -52,12 +52,48 @@ def set_theme():
         .dataframe th { background-color: #4D6BFE !important; color: white !important; text-align: center !important;}
         .dataframe td { text-align: center !important; border-bottom: 1px solid #444 !important; }
         .dataframe tr:hover { background-color: #333333 !important; }
-        .stDownloadButton button {
+        
+        /* ESTILO DOS BOTÕES PADRÃO E EXPORTAÇÃO */
+        .stDownloadButton button, div[data-testid="stForm"] button {
             background-color: #4D6BFE !important; color: white !important; border: none !important; border-radius: 12px !important;
             padding: 10px 24px !important; font-weight: 600 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; width: 100% !important;
         }
-        .stDownloadButton button:hover { background-color: #FF4D4D !important; transform: translateY(-2px) !important; box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important; }
+        .stDownloadButton button:hover, div[data-testid="stForm"] button:hover { 
+            background-color: #FF4D4D !important; transform: translateY(-2px) !important; box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important; 
+        }
+
+        /* ESTILO DO BOTÃO EXPANSOR (Simulação Personalizada) */
+        [data-testid="stExpander"] details summary {
+            background-color: #4D6BFE !important;
+            border-radius: 12px !important;
+            padding: 10px 24px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            border: none !important;
+        }
+        
+        [data-testid="stExpander"] details summary:hover {
+            background-color: #FF4D4D !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
+        }
+        
+        /* Cor da fonte e do ícone da setinha do expansor */
+        [data-testid="stExpander"] details summary p,
+        [data-testid="stExpander"] details summary svg {
+            color: #FFFFFF !important;
+            fill: #FFFFFF !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+        }
+        
+        /* Espaçamento interno do conteúdo do expansor */
+        [data-testid="stExpander"] details {
+            border: 1px solid #4D6BFE;
+            border-radius: 12px;
+            overflow: hidden;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -222,7 +258,6 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao, qtd_parcelas,
         vp = calcular_valor_presente(valor_parcela, taxas['diaria'], dias_comerciais)
         parcelas.append({"Item": f"Parcela {i}", "Tipo": "Parcela", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_parcela, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_parcela - vp, 2)})
 
-    # Se o balão for integrado na mesma linha do tempo (mensal + balão)
     if qtd_baloes > 0:
         intervalo = 12 if tipo_balao == "anual" else 6
         balao_count = 1
@@ -326,10 +361,11 @@ def main():
         
         data_calculo = datetime.combine(data_base, datetime.min.time())
         df_planos = gerar_tabela_todos_planos(valor_vista_bd, data_calculo)
+        
         st.dataframe(df_planos, use_container_width=True, hide_index=True)
         
         # =====================================================================
-        # A CEREJA DO BOLO: SIMULADOR PERSONALIZADO INTERATIVO
+        # A CEREJA DO BOLO: SIMULADOR PERSONALIZADO INTERATIVO COM BOTÃO ESTILIZADO
         # =====================================================================
         st.markdown("---")
         with st.expander("✨ Criar Condição Personalizada (Fora da Tabela)", expanded=False):
@@ -337,14 +373,11 @@ def main():
             
             c_col1, c_col2 = st.columns(2)
             
-            # Coluna 1: Imóvel e Entrada
             v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", value=float_to_str_input(valor_vista_bd), key="c_imovel")
             v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", value=float_to_str_input(valor_vista_bd * 0.10), key="c_entrada")
             
-            # Coluna 2: Parcelas e Juros
             qtd_p_custom = c_col2.number_input("Quantidade de Parcelas", min_value=1, max_value=156, value=72, step=1)
             
-            # Define Taxa Baseada na Faixa
             if 1 <= qtd_p_custom <= 36: taxa_custom_padrao = 0.0
             elif 37 <= qtd_p_custom <= 48: taxa_custom_padrao = 0.395
             elif 49 <= qtd_p_custom <= 60: taxa_custom_padrao = 0.59
@@ -361,7 +394,6 @@ def main():
             v_parcela_custom_str = b_col2.text_input("Fixar Valor da Parcela (Opcional)", value="", placeholder="R$ 0,00")
             v_balao_custom_str = b_col3.text_input("Fixar Valor do Balão (Opcional)", value="", placeholder="R$ 0,00")
 
-            # --- LÓGICA DO CÁLCULO PERSONALIZADO ---
             v_imovel = parse_currency(v_imovel_custom_str)
             v_entrada = parse_currency(v_entrada_custom_str)
             v_parc_fixa = parse_currency(v_parcela_custom_str)
@@ -375,7 +407,6 @@ def main():
             if "anual" in modalidade_custom: qtd_b_custom = qtd_p_custom // 12
             elif "semestral" in modalidade_custom: qtd_b_custom = qtd_p_custom // 6
             
-            # Fatores VP Custom
             datas_p = [ajustar_data_vencimento(data_calculo, "mensal", i, data_calculo.day) for i in range(1, qtd_p_custom + 1)]
             datas_b = [ajustar_data_vencimento(data_calculo, "anual" if "anual" in modalidade_custom else "semestral", i, data_calculo.day) for i in range(1, qtd_b_custom + 1)]
             
@@ -386,7 +417,6 @@ def main():
             
             if "balão" in modalidade_custom and qtd_b_custom > 0:
                 if v_parc_fixa == 0 and v_balao_fixo == 0:
-                    # Aplica a regra dos 47% do plano oficial
                     vp_b = v_imovel * 0.47
                     vp_p = valor_financiado - vp_b
                     val_p_final = (vp_p / f_vp_p) if f_vp_p > 0 else 0
@@ -402,10 +432,9 @@ def main():
                     vp_p = valor_financiado - vp_b
                     val_p_final = (vp_p / f_vp_p) if f_vp_p > 0 else 0
             else:
-                if v_parc_fixa > 0: val_p_final = v_parc_fixa # Sub ou Super financiado
+                if v_parc_fixa > 0: val_p_final = v_parc_fixa
                 else: val_p_final = (valor_financiado / f_vp_p) if f_vp_p > 0 else 0
 
-            # Exibição do Resultado Customizado
             st.markdown("##### 📊 Resumo do Plano Personalizado")
             r1, r2, r3, r4 = st.columns(4)
             r1.metric("Valor Financiado", formatar_moeda(valor_financiado))
@@ -413,7 +442,6 @@ def main():
             r3.metric("Valor da Parcela", formatar_moeda(val_p_final))
             r4.metric("Valor do Balão", formatar_moeda(val_b_final) if qtd_b_custom > 0 else "-")
             
-            # Geração do Cronograma Custom para PDF/Excel
             cronograma_custom = gerar_cronograma(
                 valor_financiado, val_p_final, val_b_final, qtd_p_custom, qtd_b_custom, 
                 data_calculo, taxas, tipo_balao="anual" if "anual" in modalidade_custom else "semestral"
@@ -434,7 +462,7 @@ def main():
             btn_col2.download_button("📥 Exportar Plano Personalizado (Excel)", excel_custom, "simulacao_personalizada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # =====================================================================
-        # EXPORTAÇÃO DOS PLANOS OFICIAIS (Abaixo do Personalizado)
+        # EXPORTAÇÃO DOS PLANOS OFICIAIS
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📄 Exportar Plano Oficial (Mês a Mês)")
@@ -443,7 +471,6 @@ def main():
         plano_escolhido = st.selectbox("Selecione o Plano:", PLANOS_DISPONIVEIS)
         
         if plano_escolhido:
-            # Lógica exata do plano selecionado na tabela oficial (Regra 47%)
             qtd_p, qtd_b, pct_e, t_mensal = extrair_dados_plano(plano_escolhido)
             taxas_plano = calcular_taxas(t_mensal)
             entrada_plano = valor_vista_bd * pct_e
