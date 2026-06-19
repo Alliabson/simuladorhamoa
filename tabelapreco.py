@@ -60,7 +60,7 @@ def set_theme():
     </style>
     """, unsafe_allow_html=True)
 
-# --- Funções Matemáticas e Financeiras (Da sua Lógica Original) ---
+# --- Funções Matemáticas e Financeiras ---
 def calcular_taxas(taxa_mensal_percentual):
     try:
         taxa_mensal_decimal = float(taxa_mensal_percentual) / 100
@@ -132,7 +132,7 @@ def extrair_dados_plano(plano_str):
         
     return qtd_parcelas, qtd_baloes, pct_entrada, taxa_mensal
 
-# --- PRÉ-CÁLCULO DOS FATORES PARA PERFORMANCE (Muito rápido!) ---
+# --- PRÉ-CÁLCULO DOS FATORES ---
 @st.cache_data
 def pre_calcular_fatores(data_base_str):
     data_base = datetime.strptime(data_base_str, "%Y-%m-%d")
@@ -148,41 +148,44 @@ def pre_calcular_fatores(data_base_str):
         datas_b = [ajustar_data_vencimento(data_base, "anual", i, data_base.day) for i in range(1, qtd_b + 1)]
         f_vp_b = calcular_fator_vp(datas_b, data_base, taxas['diaria'])
         
+        # O nome curto da aba do Excel deve ter até 31 caracteres. Ex: "72x + 6B"
+        nome_aba = f"{qtd_p}x" + (f" + {qtd_b}B" if qtd_b > 0 else "")
+        
         fatores_planos[plano] = {
             'qtd_p': qtd_p, 'qtd_b': qtd_b, 'pct_e': pct_e, 
             'f_vp_p': f_vp_p, 'f_vp_b': f_vp_b,
-            'nome_col': f"{qtd_p}x" + (f" + {qtd_b}B" if qtd_b > 0 else "")
+            'nome_aba': nome_aba
         }
     return fatores_planos
 
-# --- GERAÇÃO DA TABELA MASTER ---
-def gerar_tabela_master(df_lotes, data_base):
-    # Pré-calcula os fatores matemáticos 1 única vez para velocidade
+# --- GERAÇÃO DAS TABELAS SEPARADAS POR PLANO ---
+def gerar_tabelas_por_plano(df_lotes, data_base):
     fatores = pre_calcular_fatores(data_base.strftime("%Y-%m-%d"))
-    linhas_tabela = []
+    dicionario_tabelas = {}
 
-    progress_bar = st.progress(0)
-    total_lotes = len(df_lotes)
-
+    # Lê os lotes apenas uma vez
+    lotes_info = []
     for i, row in df_lotes.iterrows():
         try: v_vista = float(row['Valor a Vista'])
         except: continue
-        
         if pd.isna(v_vista) or v_vista <= 0: continue
 
-        # Identificação da linha
-        linha_dict = {
+        lotes_info.append({
             'Quadra': str(row.get('Quadra', '')).replace('.0', ''),
             'Lote': str(row.get('Lote', '')).replace('.0', ''),
             'Área (m²)': float(row.get('Área em Metro Quadrado', 0)),
             'Valor à Vista': v_vista
-        }
+        })
 
-        # Aplica os 20 planos matematicamente nesse lote
-        for plano_nome, fat in fatores.items():
+    # Cria uma tabela (DataFrame) para cada plano
+    for plano_nome, fat in fatores.items():
+        linhas_plano = []
+        for lote in lotes_info:
+            v_vista = lote['Valor à Vista']
             entrada_total = v_vista * fat['pct_e']
+            entrada_3x = entrada_total / 3
             financiado = v_vista - entrada_total
-            
+
             if fat['qtd_b'] > 0:
                 vp_baloes = v_vista * 0.47
                 vp_parcelas = financiado - vp_baloes
@@ -193,25 +196,37 @@ def gerar_tabela_master(df_lotes, data_base):
             valor_parcela = (vp_parcelas / fat['f_vp_p']) if (fat['qtd_p'] > 0 and fat['f_vp_p'] > 0) else 0
             valor_balao = (vp_baloes / fat['f_vp_b']) if (fat['qtd_b'] > 0 and fat['f_vp_b'] > 0) else 0
 
-            # Preenche as colunas para o Excel (em formato de número real para excel somar)
-            prefixo = fat['nome_col']
-            linha_dict[f'{prefixo} (Entrada)'] = entrada_total
-            linha_dict[f'{prefixo} (Parcela)'] = valor_parcela
-            if fat['qtd_b'] > 0:
-                linha_dict[f'{prefixo} (Balão Anual)'] = valor_balao
+            # Estrutura base da linha para aquele lote
+            linha = {
+                'Quadra': lote['Quadra'],
+                'Lote': lote['Lote'],
+                'Área (m²)': lote['Área (m²)'],
+                'Valor à Vista': v_vista,
+                'Entrada Total': entrada_total,
+                'Sinal (Entrada 3x)': entrada_3x,
+                'Valor Financiado': financiado,
+                'Qtd Parcelas': fat['qtd_p'],
+                'Valor da Parcela': valor_parcela
+            }
 
-        linhas_tabela.append(linha_dict)
-        progress_bar.progress((i + 1) / total_lotes)
-        
-    progress_bar.empty()
-    return pd.DataFrame(linhas_tabela)
+            # Insere colunas de Balão apenas se houver balão no plano
+            if fat['qtd_b'] > 0:
+                linha['Qtd Balões'] = fat['qtd_b']
+                linha['Valor do Balão'] = valor_balao
+
+            linhas_plano.append(linha)
+
+        # Associa a tabela pronta ao nome da Aba (Ex: "72x + 6B")
+        dicionario_tabelas[fat['nome_aba']] = pd.DataFrame(linhas_plano)
+
+    return dicionario_tabelas
 
 # --- APP PRINCIPAL ---
 def main():
     set_theme()
     st.write("\n")
     st.title("📊 Gerador de Tabelas de Preços Master")
-    st.markdown("Faça o upload da sua planilha bruta de lotes. O sistema calculará todas as condições de pagamento e gerará uma planilha Excel completa e pronta para uso.")
+    st.markdown("Faça o upload da sua planilha bruta de lotes. O sistema vai gerar um **arquivo Excel organizado com uma aba (planilha) para cada plano de pagamento**, incluindo as colunas específicas de balão onde necessário.")
     
     st.markdown("---")
     
@@ -235,33 +250,44 @@ def main():
             
             st.success(f"Planilha carregada com sucesso! {len(df_lotes)} lotes encontrados.")
             
-            if st.button("🚀 Gerar Tabela de Preços Completa"):
+            if st.button("🚀 Gerar e Organizar Tabela Completa"):
                 data_calculo = datetime.combine(data_base, datetime.min.time())
                 
-                with st.spinner("Processando todos os lotes e planos. Isso pode levar alguns segundos..."):
-                    df_master = gerar_tabela_master(df_lotes, data_calculo)
+                with st.spinner("Construindo as abas separadas por plano. Isso pode levar alguns segundos..."):
+                    dicionario_tabelas = gerar_tabelas_por_plano(df_lotes, data_calculo)
                 
-                st.subheader("Pré-visualização da Tabela Gerada")
+                st.subheader("👀 Pré-visualização")
+                st.markdown("Selecione abaixo a aba do plano que deseja conferir na tela:")
                 
-                # Formatação visual apenas para o preview no Streamlit (não afeta o Excel)
+                # Permite ver uma aba específica na tela
+                abas_disponiveis = list(dicionario_tabelas.keys())
+                aba_selecionada = st.selectbox("Aba / Plano:", abas_disponiveis)
+                
+                df_preview = dicionario_tabelas[aba_selecionada]
+                
+                # Configura como os valores aparecem na tela do Streamlit
                 config_colunas = {
                     col: st.column_config.NumberColumn(format="R$ %.2f") 
-                    for col in df_master.columns if col not in ['Quadra', 'Lote', 'Área (m²)']
+                    for col in df_preview.columns if col not in ['Quadra', 'Lote', 'Área (m²)', 'Qtd Parcelas', 'Qtd Balões']
                 }
-                st.dataframe(df_master, use_container_width=True, hide_index=True, column_config=config_colunas, height=400)
                 
-                # Preparar para Excel (Exportando como NÚMEROS reais)
+                st.dataframe(df_preview, use_container_width=True, hide_index=True, column_config=config_colunas, height=400)
+                
+                # --- Prepara para salvar no Excel (Várias Abas) ---
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_master.to_excel(writer, index=False, sheet_name='Tabela de Vendas')
+                    for nome_aba, df_plan in dicionario_tabelas.items():
+                        # O Excel salva no formato nativo de número para você poder somar/editar.
+                        df_plan.to_excel(writer, index=False, sheet_name=nome_aba)
                 output.seek(0)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Tabela Pronta!")
+                st.markdown("### 📥 Arquivo Pronto!")
+                st.markdown("Clique no botão abaixo para baixar o arquivo. Ao abrir no Excel, você verá as abas na parte inferior da tela, uma para cada plano!")
                 st.download_button(
                     label="Baixar Tabela em Excel (.xlsx)",
                     data=output,
-                    file_name=f"Tabela_de_Precos_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
+                    file_name=f"Tabela_Precos_Separada_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
