@@ -79,7 +79,6 @@ def set_theme():
             box-shadow: 0 4px 8px rgba(255, 77, 77, 0.2) !important;
         }
         
-        /* Cor da fonte e do ícone da setinha do expansor */
         [data-testid="stExpander"] details summary p,
         [data-testid="stExpander"] details summary svg {
             color: #FFFFFF !important;
@@ -88,7 +87,6 @@ def set_theme():
             font-size: 16px !important;
         }
         
-        /* Espaçamento interno do conteúdo do expansor */
         [data-testid="stExpander"] details {
             border: 1px solid #4D6BFE;
             border-radius: 12px;
@@ -330,7 +328,7 @@ def main():
     df_lotes = carregar_dados_lotes()
     st.markdown("---")
     
-    # 1. Filtros
+    # 1. Filtros Iniciais
     col1, col2, col3 = st.columns([2, 2, 2])
     quadras_disp = sorted(df_lotes['Quadra'].dropna().unique()) if not df_lotes.empty else []
     quadra_selecionada = col1.selectbox("Selecione a Quadra", options=[""] + list(quadras_disp))
@@ -344,7 +342,9 @@ def main():
         
     data_base = col3.date_input("Data de Início do Contrato", value=datetime.now(), format="DD/MM/YYYY")
 
-    # 2. Tela Automática e Personalizada (Se lote selecionado)
+    # =====================================================================
+    # SE O LOTE FOI SELECIONADO: EXIBE TABELA E SIMULADOR PERSONALIZADO
+    # =====================================================================
     if quadra_selecionada and lote_selecionado:
         linha = df_lotes[(df_lotes['Quadra'] == quadra_selecionada) & (df_lotes['Lote'] == lote_selecionado)].iloc[0]
         valor_vista_bd = float(linha['Valor a Vista'])
@@ -361,39 +361,59 @@ def main():
         
         data_calculo = datetime.combine(data_base, datetime.min.time())
         df_planos = gerar_tabela_todos_planos(valor_vista_bd, data_calculo)
-        
         st.dataframe(df_planos, use_container_width=True, hide_index=True)
         
-        # =====================================================================
-        # A CEREJA DO BOLO: SIMULADOR PERSONALIZADO INTERATIVO COM BOTÃO ESTILIZADO
-        # =====================================================================
+        # ---------------------------------------------------------------------
+        # SIMULADOR PERSONALIZADO INTERATIVO COM GATILHO AUTOMÁTICO NA TAXA
+        # ---------------------------------------------------------------------
         st.markdown("---")
         with st.expander("✨ Criar Condição Personalizada (Fora da Tabela)", expanded=False):
-            st.markdown("Crie um plano sob medida. **Edite os valores abaixo e a tabela será atualizada automaticamente!**")
+            st.markdown("Crie um plano sob medida. **Edite os valores abaixo e o resumo atualizará na mesma hora!**")
             
             c_col1, c_col2 = st.columns(2)
             
-            v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", value=float_to_str_input(valor_vista_bd), key="c_imovel")
-            v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", value=float_to_str_input(valor_vista_bd * 0.10), key="c_entrada")
+            # --- Controle de Estado para a Taxa Automática ---
+            if 'c_parcelas' not in st.session_state:
+                st.session_state.c_parcelas = 72
+            if 'c_taxa' not in st.session_state:
+                st.session_state.c_taxa = "0,790"
+
+            # Callback: Sempre que a parcela mudar, isso roda imediatamente antes de desenhar a tela
+            def atualizar_taxa_automatica():
+                qtd = st.session_state.c_parcelas
+                if 1 <= qtd <= 36: t = 0.0
+                elif 37 <= qtd <= 48: t = 0.395
+                elif 49 <= qtd <= 60: t = 0.59
+                elif 61 <= qtd <= 156: t = 0.79
+                else: t = 0.0
+                # Salva a nova taxa formatada na memória
+                st.session_state.c_taxa = f"{t:.3f}".replace(".", ",")
+
+            # Inputs do Imóvel
+            v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", value=float_to_str_input(valor_vista_bd))
+            v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", value=float_to_str_input(valor_vista_bd * 0.10))
             
-            qtd_p_custom = c_col2.number_input("Quantidade de Parcelas", min_value=1, max_value=156, value=72, step=1)
+            # Inputs que acionam a inteligência
+            qtd_p_custom = c_col2.number_input(
+                "Quantidade de Parcelas", 
+                min_value=1, max_value=156, step=1, 
+                key="c_parcelas", 
+                on_change=atualizar_taxa_automatica # Ativa o gatilho automático
+            )
             
-            if 1 <= qtd_p_custom <= 36: taxa_custom_padrao = 0.0
-            elif 37 <= qtd_p_custom <= 48: taxa_custom_padrao = 0.395
-            elif 49 <= qtd_p_custom <= 60: taxa_custom_padrao = 0.59
-            elif 61 <= qtd_p_custom <= 156: taxa_custom_padrao = 0.79
-            else: taxa_custom_padrao = 0.0
-                
-            taxa_custom_str = c_col2.text_input("Taxa Mensal (%)", value=str(taxa_custom_padrao).replace(".", ","), key="c_taxa")
+            # A taxa atualiza sozinha, mas AINDA É EDITÁVEL pelo corretor!
+            taxa_custom_str = c_col2.text_input("Taxa Mensal Aplicada (%)", key="c_taxa")
+            st.caption("A taxa acima muda automaticamente conforme a parcela, mas você pode substituí-la por uma taxa especial.")
             
             st.markdown("#### Configuração do Balão")
-            st.caption("Deixe zerado para dividir igualmente ou aplique um valor fixo. Se ambos (parcela e balão) ficarem vazios, usamos a regra dos 47% do valor à vista para o balão.")
+            st.caption("Deixe em branco para usar o padrão da construtora (47% do valor à vista) ou fixe o valor que o cliente quiser.")
             b_col1, b_col2, b_col3 = st.columns(3)
             
             modalidade_custom = b_col1.selectbox("Modalidade", ["mensal", "mensal + balão anual", "mensal + balão semestral"])
             v_parcela_custom_str = b_col2.text_input("Fixar Valor da Parcela (Opcional)", value="", placeholder="R$ 0,00")
             v_balao_custom_str = b_col3.text_input("Fixar Valor do Balão (Opcional)", value="", placeholder="R$ 0,00")
 
+            # Executa a matemática em tempo real
             v_imovel = parse_currency(v_imovel_custom_str)
             v_entrada = parse_currency(v_entrada_custom_str)
             v_parc_fixa = parse_currency(v_parcela_custom_str)
@@ -462,7 +482,7 @@ def main():
             btn_col2.download_button("📥 Exportar Plano Personalizado (Excel)", excel_custom, "simulacao_personalizada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # =====================================================================
-        # EXPORTAÇÃO DOS PLANOS OFICIAIS
+        # EXPORTAÇÃO DOS PLANOS OFICIAIS (Ficam logo abaixo)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📄 Exportar Plano Oficial (Mês a Mês)")
@@ -502,10 +522,10 @@ def main():
             
             c1_exp, c2_exp = st.columns(2)
             pdf_oficial = gerar_pdf(cronograma_oficial, export_data_oficial)
-            c1_exp.download_button("📥 Exportar PDF (Plano Oficial)", pdf_oficial, "simulacao_oficial.pdf", "application/pdf")
+            c1_exp.download_button("📥 Exportar PDF (Plano Oficial)", pdf_oficial, "simulacao_celeste.pdf", "application/pdf")
             
             excel_oficial = gerar_excel(cronograma_oficial, export_data_oficial)
-            c2_exp.download_button("📥 Exportar Excel (Plano Oficial)", excel_oficial, "simulacao_oficial.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            c2_exp.download_button("📥 Exportar Excel (Plano Oficial)", excel_oficial, "simulacao_celeste.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == '__main__':
     main()
