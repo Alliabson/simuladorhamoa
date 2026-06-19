@@ -148,7 +148,6 @@ def pre_calcular_fatores(data_base_str):
         datas_b = [ajustar_data_vencimento(data_base, "anual", i, data_base.day) for i in range(1, qtd_b + 1)]
         f_vp_b = calcular_fator_vp(datas_b, data_base, taxas['diaria'])
         
-        # O nome curto da aba do Excel deve ter até 31 caracteres. Ex: "72x + 6B"
         nome_aba = f"{qtd_p}x" + (f" + {qtd_b}B" if qtd_b > 0 else "")
         
         fatores_planos[plano] = {
@@ -158,26 +157,28 @@ def pre_calcular_fatores(data_base_str):
         }
     return fatores_planos
 
-# --- GERAÇÃO DAS TABELAS SEPARADAS POR PLANO ---
+# --- GERAÇÃO DAS TABELAS SEPARADAS COM SEU NOVO CABEÇALHO ---
 def gerar_tabelas_por_plano(df_lotes, data_base):
     fatores = pre_calcular_fatores(data_base.strftime("%Y-%m-%d"))
     dicionario_tabelas = {}
 
-    # Lê os lotes apenas uma vez
     lotes_info = []
     for i, row in df_lotes.iterrows():
         try: v_vista = float(row['Valor a Vista'])
         except: continue
         if pd.isna(v_vista) or v_vista <= 0: continue
 
+        area = float(row.get('Área em Metro Quadrado', 0))
+        val_m2 = (v_vista / area) if area > 0 else 0
+
         lotes_info.append({
             'Quadra': str(row.get('Quadra', '')).replace('.0', ''),
             'Lote': str(row.get('Lote', '')).replace('.0', ''),
-            'Área (m²)': float(row.get('Área em Metro Quadrado', 0)),
+            'M²': area,
+            'Valor do M²': val_m2,
             'Valor à Vista': v_vista
         })
 
-    # Cria uma tabela (DataFrame) para cada plano
     for plano_nome, fat in fatores.items():
         linhas_plano = []
         for lote in lotes_info:
@@ -196,27 +197,27 @@ def gerar_tabelas_por_plano(df_lotes, data_base):
             valor_parcela = (vp_parcelas / fat['f_vp_p']) if (fat['qtd_p'] > 0 and fat['f_vp_p'] > 0) else 0
             valor_balao = (vp_baloes / fat['f_vp_b']) if (fat['qtd_b'] > 0 and fat['f_vp_b'] > 0) else 0
 
-            # Estrutura base da linha para aquele lote
+            # SEU NOVO CABEÇALHO MODELADO EXATAMENTE IGUAL AO SEU PRINT
             linha = {
                 'Quadra': lote['Quadra'],
                 'Lote': lote['Lote'],
-                'Área (m²)': lote['Área (m²)'],
+                'M²': lote['M²'],
+                'Valor do M²': lote['Valor do M²'],
                 'Valor à Vista': v_vista,
-                'Entrada Total': entrada_total,
-                'Sinal (Entrada 3x)': entrada_3x,
-                'Valor Financiado': financiado,
+                '% Entrada': f"{int(fat['pct_e'] * 100)}%",
+                'Entrada Comercial (A Vista)': entrada_total,
+                'Sinal 3x': entrada_3x,
+                'Saldo Financiado': financiado,
                 'Qtd Parcelas': fat['qtd_p'],
                 'Valor da Parcela': valor_parcela
             }
 
-            # Insere colunas de Balão apenas se houver balão no plano
             if fat['qtd_b'] > 0:
                 linha['Qtd Balões'] = fat['qtd_b']
                 linha['Valor do Balão'] = valor_balao
 
             linhas_plano.append(linha)
 
-        # Associa a tabela pronta ao nome da Aba (Ex: "72x + 6B")
         dicionario_tabelas[fat['nome_aba']] = pd.DataFrame(linhas_plano)
 
     return dicionario_tabelas
@@ -225,8 +226,8 @@ def gerar_tabelas_por_plano(df_lotes, data_base):
 def main():
     set_theme()
     st.write("\n")
-    st.title("📊 Gerador de Tabelas de Preços Master")
-    st.markdown("Faça o upload da sua planilha bruta de lotes. O sistema vai gerar um **arquivo Excel organizado com uma aba (planilha) para cada plano de pagamento**, incluindo as colunas específicas de balão onde necessário.")
+    st.title("📊 Gerador de Tabelas de Preços Master - Celeste")
+    st.markdown("Faça o upload da sua planilha bruta de lotes. O sistema criará o arquivo Excel com abas separadas e a estrutura de colunas idêntica ao seu modelo comercial.")
     
     st.markdown("---")
     
@@ -250,44 +251,44 @@ def main():
             
             st.success(f"Planilha carregada com sucesso! {len(df_lotes)} lotes encontrados.")
             
-            if st.button("🚀 Gerar e Organizar Tabela Completa"):
+            if st.button("🚀 Gerar e Organizar Tabelas com Novo Cabeçalho"):
                 data_calculo = datetime.combine(data_base, datetime.min.time())
                 
-                with st.spinner("Construindo as abas separadas por plano. Isso pode levar alguns segundos..."):
+                with st.spinner("Construindo as abas estruturadas..."):
                     dicionario_tabelas = gerar_tabelas_por_plano(df_lotes, data_calculo)
                 
-                st.subheader("👀 Pré-visualização")
-                st.markdown("Selecione abaixo a aba do plano que deseja conferir na tela:")
-                
-                # Permite ver uma aba específica na tela
+                st.subheader("👀 Pré-visualização da Tabela por Aba")
                 abas_disponiveis = list(dicionario_tabelas.keys())
-                aba_selecionada = st.selectbox("Aba / Plano:", abas_disponiveis)
+                aba_selecionada = st.selectbox("Escolha a Aba para Visualizar:", abas_disponiveis)
                 
                 df_preview = dicionario_tabelas[aba_selecionada]
                 
-                # Configura como os valores aparecem na tela do Streamlit
+                # Formata os números apenas para a exibição na tela do app
+                colunas_dinamicas_moeda = [
+                    'Valor do M²', 'Valor à Vista', 'Entrada Comercial (A Vista)', 
+                    'Sinal 3x', 'Saldo Financiado', 'Valor da Parcela', 'Valor do Balão'
+                ]
                 config_colunas = {
                     col: st.column_config.NumberColumn(format="R$ %.2f") 
-                    for col in df_preview.columns if col not in ['Quadra', 'Lote', 'Área (m²)', 'Qtd Parcelas', 'Qtd Balões']
+                    for col in df_preview.columns if col in colunas_dinamicas_moeda
                 }
+                config_colunas['M²'] = st.column_config.NumberColumn(format="%.2f m²")
                 
                 st.dataframe(df_preview, use_container_width=True, hide_index=True, column_config=config_colunas, height=400)
                 
-                # --- Prepara para salvar no Excel (Várias Abas) ---
+                # --- Exportador Executivo Excel ---
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     for nome_aba, df_plan in dicionario_tabelas.items():
-                        # O Excel salva no formato nativo de número para você poder somar/editar.
                         df_plan.to_excel(writer, index=False, sheet_name=nome_aba)
                 output.seek(0)
                 
                 st.markdown("---")
-                st.markdown("### 📥 Arquivo Pronto!")
-                st.markdown("Clique no botão abaixo para baixar o arquivo. Ao abrir no Excel, você verá as abas na parte inferior da tela, uma para cada plano!")
+                st.markdown("### 📥 Tabela Master Pronta!")
                 st.download_button(
-                    label="Baixar Tabela em Excel (.xlsx)",
+                    label="Baixar Tabela de Vendas em Abas (.xlsx)",
                     data=output,
-                    file_name=f"Tabela_Precos_Separada_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
+                    file_name=f"Tabela_Vendas_Celeste_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
