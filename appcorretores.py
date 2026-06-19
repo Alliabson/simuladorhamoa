@@ -364,46 +364,54 @@ def main():
         st.dataframe(df_planos, use_container_width=True, hide_index=True)
         
         # ---------------------------------------------------------------------
-        # SIMULADOR PERSONALIZADO INTERATIVO COM GATILHO AUTOMÁTICO NA TAXA
+        # SIMULADOR PERSONALIZADO INTERATIVO COM GATILHO AUTOMÁTICO
         # ---------------------------------------------------------------------
         st.markdown("---")
         with st.expander("✨ Criar Condição Personalizada (Fora da Tabela)", expanded=False):
-            st.markdown("Crie um plano sob medida. **Edite os valores abaixo e o resumo atualizará na mesma hora!**")
+            st.markdown("Crie um plano sob medida. **Edite a quantidade de parcelas e o sistema calculará as taxas e a entrada na hora!**")
             
             c_col1, c_col2 = st.columns(2)
             
-            # --- Controle de Estado para a Taxa Automática ---
-            if 'c_parcelas' not in st.session_state:
+            # --- Controle de Mudança de Lote para Resetar os Estados ---
+            lote_atual_id = f"{quadra_selecionada}-{lote_selecionado}"
+            if 'lote_ativo' not in st.session_state or st.session_state.lote_ativo != lote_atual_id:
+                st.session_state.lote_ativo = lote_atual_id
                 st.session_state.c_parcelas = 72
-            if 'c_taxa' not in st.session_state:
                 st.session_state.c_taxa = "0,790"
+                st.session_state.c_imovel = float_to_str_input(valor_vista_bd)
+                st.session_state.c_entrada = float_to_str_input(valor_vista_bd * 0.06) # 72x puxa 6%
 
-            # Callback: Sempre que a parcela mudar, isso roda imediatamente antes de desenhar a tela
-            def atualizar_taxa_automatica():
+            # --- Callback: Sempre que a parcela mudar, atualiza Taxa e Entrada ---
+            def atualizar_valores_automaticos():
                 qtd = st.session_state.c_parcelas
+                
+                # Regra da Taxa
                 if 1 <= qtd <= 36: t = 0.0
                 elif 37 <= qtd <= 48: t = 0.395
                 elif 49 <= qtd <= 60: t = 0.59
                 elif 61 <= qtd <= 156: t = 0.79
                 else: t = 0.0
-                # Salva a nova taxa formatada na memória
                 st.session_state.c_taxa = f"{t:.3f}".replace(".", ",")
+                
+                # Regra da Entrada: até 60x = 10%, acima de 60x = 6%
+                pct = 0.10 if qtd <= 60 else 0.06
+                v_imovel_calc = parse_currency(st.session_state.c_imovel)
+                st.session_state.c_entrada = float_to_str_input(v_imovel_calc * pct)
 
-            # Inputs do Imóvel
-            v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", value=float_to_str_input(valor_vista_bd))
-            v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", value=float_to_str_input(valor_vista_bd * 0.10))
+            # Inputs do Imóvel (Vinculados ao session_state)
+            v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", key="c_imovel")
+            v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", key="c_entrada")
             
-            # Inputs que acionam a inteligência
+            # Input que aciona a inteligência (Gatilho)
             qtd_p_custom = c_col2.number_input(
                 "Quantidade de Parcelas", 
                 min_value=1, max_value=156, step=1, 
                 key="c_parcelas", 
-                on_change=atualizar_taxa_automatica # Ativa o gatilho automático
+                on_change=atualizar_valores_automaticos
             )
             
-            # A taxa atualiza sozinha, mas AINDA É EDITÁVEL pelo corretor!
             taxa_custom_str = c_col2.text_input("Taxa Mensal Aplicada (%)", key="c_taxa")
-            st.caption("A taxa acima muda automaticamente conforme a parcela, mas você pode substituí-la por uma taxa especial.")
+            st.caption("A taxa e a entrada mudam automaticamente, mas você pode substituí-las por valores da sua negociação.")
             
             st.markdown("#### Configuração do Balão")
             st.caption("Deixe em branco para usar o padrão da construtora (47% do valor à vista) ou fixe o valor que o cliente quiser.")
@@ -413,7 +421,7 @@ def main():
             v_parcela_custom_str = b_col2.text_input("Fixar Valor da Parcela (Opcional)", value="", placeholder="R$ 0,00")
             v_balao_custom_str = b_col3.text_input("Fixar Valor do Balão (Opcional)", value="", placeholder="R$ 0,00")
 
-            # Executa a matemática em tempo real
+            # --- Executa a matemática em tempo real ---
             v_imovel = parse_currency(v_imovel_custom_str)
             v_entrada = parse_currency(v_entrada_custom_str)
             v_parc_fixa = parse_currency(v_parcela_custom_str)
@@ -482,7 +490,7 @@ def main():
             btn_col2.download_button("📥 Exportar Plano Personalizado (Excel)", excel_custom, "simulacao_personalizada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # =====================================================================
-        # EXPORTAÇÃO DOS PLANOS OFICIAIS (Ficam logo abaixo)
+        # EXPORTAÇÃO DOS PLANOS OFICIAIS
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📄 Exportar Plano Oficial (Mês a Mês)")
