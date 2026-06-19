@@ -75,6 +75,14 @@ def carregar_dados_lotes():
     except Exception: return pd.DataFrame()
 
 # --- Funções Matemáticas e Financeiras ---
+def parse_currency(value_str: str) -> float:
+    if not isinstance(value_str, str) or not value_str.strip(): return 0.0
+    try: return float(re.sub(r'[R$\s\.]', '', value_str.strip()).replace(',', '.'))
+    except (ValueError, TypeError): return 0.0
+
+def float_to_str_input(valor):
+    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 def formatar_moeda(valor, simbolo=True):
     try:
         if valor is None or valor == '': return "R$ 0,00" if simbolo else "0,00"
@@ -97,7 +105,12 @@ def calcular_taxas(taxa_mensal_percentual):
 def ajustar_data_vencimento(data_base, periodo, num_periodo=1, dia_vencimento=None):
     if not isinstance(data_base, datetime): data_base = datetime.combine(data_base, datetime.min.time())
     dia = dia_vencimento if dia_vencimento is not None else data_base.day
-    months_to_add = num_periodo if periodo == "mensal" else (12 * num_periodo if periodo == "anual" else 0)
+    
+    if periodo == "mensal": months_to_add = num_periodo
+    elif periodo == "semestral": months_to_add = 6 * num_periodo
+    elif periodo == "anual": months_to_add = 12 * num_periodo
+    else: months_to_add = 0
+        
     if months_to_add == 0: return data_base
     total_meses = data_base.month + months_to_add
     novo_ano = data_base.year + (total_meses - 1) // 12
@@ -110,7 +123,6 @@ def calcular_valor_presente(valor_futuro, taxa_diaria, dias):
     return round(float(valor_futuro) / ((1 + taxa_diaria) ** dias), 2)
 
 def calcular_fator_vp(datas_vencimento, data_inicio, taxa_diaria):
-    """ Calcula a soma dos fatores de descapitalização (equivalente a fórmula PGTO no Excel) """
     if taxa_diaria <= 0: return float(len(datas_vencimento))
     fator_total = 0.0
     for data_venc in datas_vencimento:
@@ -143,17 +155,13 @@ PLANOS_DISPONIVEIS = [
 ]
 
 def extrair_dados_plano(plano_str):
-    """ Lê a string do plano e descobre quantidades, entrada e taxa aplicável. """
     match_p = re.search(r'(\d+)\s*[Pp]arcelas', plano_str)
     qtd_parcelas = int(match_p.group(1)) if match_p else 0
-    
     match_b = re.search(r'(\d+)\s*[Bb]al[õo]es', plano_str, re.IGNORECASE)
     qtd_baloes = int(match_b.group(1)) if match_b else 0
-    
     match_e = re.search(r'(\d+)%\s*de\s*entrada', plano_str)
     pct_entrada = float(match_e.group(1))/100 if match_e else 0.10
 
-    # Lógica de faixas de juros informada por você
     if 1 <= qtd_parcelas <= 36: taxa_mensal = 0.0
     elif 37 <= qtd_parcelas <= 48: taxa_mensal = 0.395
     elif 49 <= qtd_parcelas <= 60: taxa_mensal = 0.59
@@ -164,17 +172,14 @@ def extrair_dados_plano(plano_str):
 
 def gerar_tabela_todos_planos(valor_vista, data_base):
     resultados = []
-    
     for plano in PLANOS_DISPONIVEIS:
         qtd_parcelas, qtd_baloes, pct_entrada, taxa_mensal = extrair_dados_plano(plano)
         taxas = calcular_taxas(taxa_mensal)
         
-        # 1. Cálculos Base
         entrada_total = valor_vista * pct_entrada
         entrada_3x = entrada_total / 3
         valor_financiado_total = valor_vista - entrada_total
         
-        # 2. Lógica Exata do seu Excel (47% do valor à vista para balões)
         if qtd_baloes > 0:
             vp_baloes = valor_vista * 0.47
             vp_parcelas = valor_vista - entrada_total - vp_baloes
@@ -182,18 +187,15 @@ def gerar_tabela_todos_planos(valor_vista, data_base):
             vp_baloes = 0
             vp_parcelas = valor_financiado_total
 
-        # 3. Cálculo dos Fatores (Substitui o PGTO)
         datas_p = [ajustar_data_vencimento(data_base, "mensal", i, data_base.day) for i in range(1, qtd_parcelas + 1)]
         fator_vp_p = calcular_fator_vp(datas_p, data_base, taxas['diaria'])
         
         datas_b = [ajustar_data_vencimento(data_base, "anual", i, data_base.day) for i in range(1, qtd_baloes + 1)]
         fator_vp_b = calcular_fator_vp(datas_b, data_base, taxas['diaria'])
 
-        # 4. Cálculo da Parcela e do Balão Financeiro Real
         valor_parcela = (vp_parcelas / fator_vp_p) if (qtd_parcelas > 0 and fator_vp_p > 0) else 0
         valor_balao = (vp_baloes / fator_vp_b) if (qtd_baloes > 0 and fator_vp_b > 0) else 0
 
-        # Nomenclatura para exibir na tabela
         nome_exibicao = f"{qtd_parcelas}x"
         if qtd_baloes > 0: nome_exibicao += f" + {qtd_baloes} Balões"
 
@@ -210,7 +212,7 @@ def gerar_tabela_todos_planos(valor_vista, data_base):
     return pd.DataFrame(resultados)
 
 # --- Gerador do Cronograma Mensal e Exportações ---
-def gerar_cronograma(valor_financiado, valor_parcela, valor_balao, qtd_parcelas, qtd_baloes, data_entrada, taxas):
+def gerar_cronograma(valor_financiado, valor_parcela, valor_balao, qtd_parcelas, qtd_baloes, data_entrada, taxas, tipo_balao="anual"):
     parcelas, baloes = [], []
     dia_vencimento = data_entrada.day
 
@@ -220,11 +222,17 @@ def gerar_cronograma(valor_financiado, valor_parcela, valor_balao, qtd_parcelas,
         vp = calcular_valor_presente(valor_parcela, taxas['diaria'], dias_comerciais)
         parcelas.append({"Item": f"Parcela {i}", "Tipo": "Parcela", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_parcela, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_parcela - vp, 2)})
 
-    for i in range(1, qtd_baloes + 1):
-        data_vencimento = ajustar_data_vencimento(data_entrada, "anual", i, dia_vencimento)
-        dias_comerciais = ((data_vencimento.year - data_entrada.year) * 12 + (data_vencimento.month - data_entrada.month)) * 30
-        vp = calcular_valor_presente(valor_balao, taxas['diaria'], dias_comerciais)
-        baloes.append({"Item": f"Balão {i}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_balao, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_balao - vp, 2)})
+    # Se o balão for integrado na mesma linha do tempo (mensal + balão)
+    if qtd_baloes > 0:
+        intervalo = 12 if tipo_balao == "anual" else 6
+        balao_count = 1
+        for i in range(intervalo, qtd_parcelas + 1, intervalo):
+            if balao_count <= qtd_baloes:
+                data_vencimento = ajustar_data_vencimento(data_entrada, "mensal", i, dia_vencimento)
+                dias_comerciais = i * 30
+                vp = calcular_valor_presente(valor_balao, taxas['diaria'], dias_comerciais)
+                baloes.append({"Item": f"Balão {balao_count}", "Tipo": "Balão", "Data_Vencimento": data_vencimento.strftime('%d/%m/%Y'), "Dias": dias_comerciais, "Valor": round(valor_balao, 2), "Valor_Presente": round(vp, 2), "Desconto_Aplicado": round(valor_balao - vp, 2)})
+                balao_count += 1
 
     cronograma = sorted(parcelas + baloes, key=lambda x: datetime.strptime(x['Data_Vencimento'], '%d/%m/%Y'))
     if cronograma:
@@ -301,7 +309,7 @@ def main():
         
     data_base = col3.date_input("Data de Início do Contrato", value=datetime.now(), format="DD/MM/YYYY")
 
-    # 2. Tela Automática (Se lote selecionado)
+    # 2. Tela Automática e Personalizada (Se lote selecionado)
     if quadra_selecionada and lote_selecionado:
         linha = df_lotes[(df_lotes['Quadra'] == quadra_selecionada) & (df_lotes['Lote'] == lote_selecionado)].iloc[0]
         valor_vista_bd = float(linha['Valor a Vista'])
@@ -314,21 +322,128 @@ def main():
         m2.metric("💰 Valor à Vista", formatar_moeda(valor_vista_bd))
         
         st.markdown("<br>### 📋 Tabela Oficial de Planos (Pronto para Print)", unsafe_allow_html=True)
-        st.caption("✅ **Automático:** Balões são calculados destinando 47% do Valor à Vista, e as parcelas com o saldo restante (regra oficial da imobiliária).")
+        st.caption("✅ **Automático:** Balões são calculados destinando 47% do Valor à Vista, e as parcelas com o saldo restante.")
         
         data_calculo = datetime.combine(data_base, datetime.min.time())
         df_planos = gerar_tabela_todos_planos(valor_vista_bd, data_calculo)
-        
         st.dataframe(df_planos, use_container_width=True, hide_index=True)
         
+        # =====================================================================
+        # A CEREJA DO BOLO: SIMULADOR PERSONALIZADO INTERATIVO
+        # =====================================================================
         st.markdown("---")
-        st.markdown("### 📄 Exportar Cronograma Detalhado (Mês a Mês)")
-        st.markdown("Para gerar o cronograma de pagamentos e enviar ao cliente, escolha o plano que ele mais gostou:")
+        with st.expander("✨ Criar Condição Personalizada (Fora da Tabela)", expanded=False):
+            st.markdown("Crie um plano sob medida. **Edite os valores abaixo e a tabela será atualizada automaticamente!**")
+            
+            c_col1, c_col2 = st.columns(2)
+            
+            # Coluna 1: Imóvel e Entrada
+            v_imovel_custom_str = c_col1.text_input("Valor do Imóvel (R$)", value=float_to_str_input(valor_vista_bd), key="c_imovel")
+            v_entrada_custom_str = c_col1.text_input("Sua Entrada (R$)", value=float_to_str_input(valor_vista_bd * 0.10), key="c_entrada")
+            
+            # Coluna 2: Parcelas e Juros
+            qtd_p_custom = c_col2.number_input("Quantidade de Parcelas", min_value=1, max_value=156, value=72, step=1)
+            
+            # Define Taxa Baseada na Faixa
+            if 1 <= qtd_p_custom <= 36: taxa_custom_padrao = 0.0
+            elif 37 <= qtd_p_custom <= 48: taxa_custom_padrao = 0.395
+            elif 49 <= qtd_p_custom <= 60: taxa_custom_padrao = 0.59
+            elif 61 <= qtd_p_custom <= 156: taxa_custom_padrao = 0.79
+            else: taxa_custom_padrao = 0.0
+                
+            taxa_custom_str = c_col2.text_input("Taxa Mensal (%)", value=str(taxa_custom_padrao).replace(".", ","), key="c_taxa")
+            
+            st.markdown("#### Configuração do Balão")
+            st.caption("Deixe zerado para dividir igualmente ou aplique um valor fixo. Se ambos (parcela e balão) ficarem vazios, usamos a regra dos 47% do valor à vista para o balão.")
+            b_col1, b_col2, b_col3 = st.columns(3)
+            
+            modalidade_custom = b_col1.selectbox("Modalidade", ["mensal", "mensal + balão anual", "mensal + balão semestral"])
+            v_parcela_custom_str = b_col2.text_input("Fixar Valor da Parcela (Opcional)", value="", placeholder="R$ 0,00")
+            v_balao_custom_str = b_col3.text_input("Fixar Valor do Balão (Opcional)", value="", placeholder="R$ 0,00")
+
+            # --- LÓGICA DO CÁLCULO PERSONALIZADO ---
+            v_imovel = parse_currency(v_imovel_custom_str)
+            v_entrada = parse_currency(v_entrada_custom_str)
+            v_parc_fixa = parse_currency(v_parcela_custom_str)
+            v_balao_fixo = parse_currency(v_balao_custom_str)
+            taxa_mensal = parse_currency(taxa_custom_str)
+            
+            valor_financiado = v_imovel - v_entrada
+            taxas = calcular_taxas(taxa_mensal)
+            
+            qtd_b_custom = 0
+            if "anual" in modalidade_custom: qtd_b_custom = qtd_p_custom // 12
+            elif "semestral" in modalidade_custom: qtd_b_custom = qtd_p_custom // 6
+            
+            # Fatores VP Custom
+            datas_p = [ajustar_data_vencimento(data_calculo, "mensal", i, data_calculo.day) for i in range(1, qtd_p_custom + 1)]
+            datas_b = [ajustar_data_vencimento(data_calculo, "anual" if "anual" in modalidade_custom else "semestral", i, data_calculo.day) for i in range(1, qtd_b_custom + 1)]
+            
+            f_vp_p = calcular_fator_vp(datas_p, data_calculo, taxas['diaria'])
+            f_vp_b = calcular_fator_vp(datas_b, data_calculo, taxas['diaria'])
+            
+            val_p_final, val_b_final = 0.0, 0.0
+            
+            if "balão" in modalidade_custom and qtd_b_custom > 0:
+                if v_parc_fixa == 0 and v_balao_fixo == 0:
+                    # Aplica a regra dos 47% do plano oficial
+                    vp_b = v_imovel * 0.47
+                    vp_p = valor_financiado - vp_b
+                    val_p_final = (vp_p / f_vp_p) if f_vp_p > 0 else 0
+                    val_b_final = (vp_b / f_vp_b) if f_vp_b > 0 else 0
+                elif v_parc_fixa > 0:
+                    val_p_final = v_parc_fixa
+                    vp_p = val_p_final * f_vp_p
+                    vp_b = valor_financiado - vp_p
+                    val_b_final = (vp_b / f_vp_b) if f_vp_b > 0 else 0
+                elif v_balao_fixo > 0:
+                    val_b_final = v_balao_fixo
+                    vp_b = val_b_final * f_vp_b
+                    vp_p = valor_financiado - vp_b
+                    val_p_final = (vp_p / f_vp_p) if f_vp_p > 0 else 0
+            else:
+                if v_parc_fixa > 0: val_p_final = v_parc_fixa # Sub ou Super financiado
+                else: val_p_final = (valor_financiado / f_vp_p) if f_vp_p > 0 else 0
+
+            # Exibição do Resultado Customizado
+            st.markdown("##### 📊 Resumo do Plano Personalizado")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Valor Financiado", formatar_moeda(valor_financiado))
+            r2.metric("Qtd. Parcelas / Balões", f"{qtd_p_custom} / {qtd_b_custom}")
+            r3.metric("Valor da Parcela", formatar_moeda(val_p_final))
+            r4.metric("Valor do Balão", formatar_moeda(val_b_final) if qtd_b_custom > 0 else "-")
+            
+            # Geração do Cronograma Custom para PDF/Excel
+            cronograma_custom = gerar_cronograma(
+                valor_financiado, val_p_final, val_b_final, qtd_p_custom, qtd_b_custom, 
+                data_calculo, taxas, tipo_balao="anual" if "anual" in modalidade_custom else "semestral"
+            )
+            
+            export_data_custom = {
+                'valor_total': v_imovel, 'entrada': v_entrada, 'taxa_mensal': taxa_mensal, 
+                'valor_financiado': valor_financiado, 'quadra': quadra_selecionada, 
+                'lote': lote_selecionado, 'metragem': metragem, 
+                'nome_plano': f"Plano Personalizado: {qtd_p_custom}x" + (f" c/ {qtd_b_custom} balões" if qtd_b_custom > 0 else "")
+            }
+            
+            btn_col1, btn_col2 = st.columns(2)
+            pdf_custom = gerar_pdf(cronograma_custom, export_data_custom)
+            btn_col1.download_button("📥 Exportar Plano Personalizado (PDF)", pdf_custom, "simulacao_personalizada.pdf", "application/pdf")
+            
+            excel_custom = gerar_excel(cronograma_custom, export_data_custom)
+            btn_col2.download_button("📥 Exportar Plano Personalizado (Excel)", excel_custom, "simulacao_personalizada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # =====================================================================
+        # EXPORTAÇÃO DOS PLANOS OFICIAIS (Abaixo do Personalizado)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 📄 Exportar Plano Oficial (Mês a Mês)")
+        st.markdown("Para gerar o cronograma oficial de pagamentos e enviar ao cliente, escolha um dos planos:")
         
-        plano_escolhido = st.selectbox("Selecione o Plano Definitivo:", PLANOS_DISPONIVEIS)
+        plano_escolhido = st.selectbox("Selecione o Plano:", PLANOS_DISPONIVEIS)
         
         if plano_escolhido:
-            # Puxa os dados para calcular exatamente aquele plano e gerar o PDF
+            # Lógica exata do plano selecionado na tabela oficial (Regra 47%)
             qtd_p, qtd_b, pct_e, t_mensal = extrair_dados_plano(plano_escolhido)
             taxas_plano = calcular_taxas(t_mensal)
             entrada_plano = valor_vista_bd * pct_e
@@ -350,20 +465,20 @@ def main():
             valor_parcela_final = (vp_p / f_vp_p) if (qtd_p > 0 and f_vp_p > 0) else 0
             valor_balao_final = (vp_b / f_vp_b) if (qtd_b > 0 and f_vp_b > 0) else 0
             
-            cronograma = gerar_cronograma(valor_financiado_plano, valor_parcela_final, valor_balao_final, qtd_p, qtd_b, data_calculo, taxas_plano)
+            cronograma_oficial = gerar_cronograma(valor_financiado_plano, valor_parcela_final, valor_balao_final, qtd_p, qtd_b, data_calculo, taxas_plano)
             
-            export_data = {
+            export_data_oficial = {
                 'valor_total': valor_vista_bd, 'entrada': entrada_plano, 'taxa_mensal': t_mensal, 
                 'valor_financiado': valor_financiado_plano, 'quadra': quadra_selecionada, 
                 'lote': lote_selecionado, 'metragem': metragem, 'nome_plano': plano_escolhido
             }
             
             c1_exp, c2_exp = st.columns(2)
-            pdf_file = gerar_pdf(cronograma, export_data)
-            c1_exp.download_button("📥 Exportar PDF Detalhado", pdf_file, "simulacao_celeste.pdf", "application/pdf")
+            pdf_oficial = gerar_pdf(cronograma_oficial, export_data_oficial)
+            c1_exp.download_button("📥 Exportar PDF (Plano Oficial)", pdf_oficial, "simulacao_oficial.pdf", "application/pdf")
             
-            excel_file = gerar_excel(cronograma, export_data)
-            c2_exp.download_button("📥 Exportar Excel Detalhado", excel_file, "simulacao_celeste.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            excel_oficial = gerar_excel(cronograma_oficial, export_data_oficial)
+            c2_exp.download_button("📥 Exportar Excel (Plano Oficial)", excel_oficial, "simulacao_oficial.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == '__main__':
     main()
