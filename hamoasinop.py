@@ -649,9 +649,9 @@ def main():
             if 1 <= qtd_parcelas <= 36:
                 taxa_mensal_para_calculo = 0.0
             elif 37 <= qtd_parcelas <= 48:
-                taxa_mensal_para_calculo = 0.395
+                taxa_mensal_para_calculo = 0.50
             elif 49 <= qtd_parcelas <= 60:
-                taxa_mensal_para_calculo = 0.59
+                taxa_mensal_para_calculo = 0.50
             elif 61 <= qtd_parcelas <= 156:
                 taxa_mensal_para_calculo = 0.79
             else: # Cobre < 1
