@@ -5,3 +5,4 @@ numpy
 numpy-financial
 openpyxl
 Pillow
+starlette==0.39.2
