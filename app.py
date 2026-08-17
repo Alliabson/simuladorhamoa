@@ -600,7 +600,7 @@ def main():
             data_input = st.date_input("Data de Entrada", value=datetime.now(), format="DD/MM/YYYY", key="data_input")
             
             # Info box sobre as taxas
-            st.info("📈 **Juros baseados no prazo do plano:**\n- Até 36 meses: **0% a.m.**\n- 37 a 48 meses: **0,395% a.m.**\n- 49 a 176 meses: **0,79% a.m.**")
+            st.info("📈 **Juros baseados no prazo do plano:**\n- Até 36 meses: **0% a.m.**\n- 37 a 60 meses: **0,50% a.m.**\n- 61 a 176 meses: **0,79% a.m.**")
             
             modalidade = st.selectbox("Modalidade de Pagamento", ["mensal", "mensal + balão", "só balão anual", "só balão semestral"], key="modalidade")
             
@@ -645,9 +645,9 @@ def main():
             # --- LÓGICA DE FAIXAS DE JUROS ATUALIZADA (Até 176 meses) ---
             if 0 <= qtd_parcelas <= 36:
                 taxa_mensal_para_calculo = 0.0
-            elif 37 <= qtd_parcelas <= 48:
-                taxa_mensal_para_calculo = 0.395
-            elif 49 <= qtd_parcelas <= 176:
+            elif 37 <= qtd_parcelas <= 60:
+                taxa_mensal_para_calculo = 0.50
+            elif 61 <= qtd_parcelas <= 176:
                 taxa_mensal_para_calculo = 0.79
             else:
                 st.error("O prazo máximo permitido é de 176 meses.")
