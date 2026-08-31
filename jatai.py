@@ -1,4 +1,3 @@
-# Hamoa Jataí.py
 import streamlit as st
 from datetime import datetime, timedelta
 from PIL import Image
@@ -606,10 +605,10 @@ def main():
             elif "semestral" in modalidade: tipo_balao = "semestral"
         
         with col2:
-            # --- INÍCIO DA MODIFICAÇÃO (Hamoa Jataí) ---
-            qtd_parcelas = st.number_input("Qtd. de Parcelas/Meses:Plano só balões 48 meses = 4 balões anual; 8 balões semestrais", min_value=0, max_value=180, step=1, key="qtd_parcelas")
+            # --- INÍCIO DA MODIFICAÇÃO ---
+            qtd_parcelas = st.number_input("Qtd. de Parcelas/Meses:Plano só balões 48 meses = 4 balões anual; 8 balões semestrais", min_value=0, max_value=156, step=1, key="qtd_parcelas")
             
-            if qtd_parcelas > 180: st.warning("A quantidade máxima de parcelas permitida é 180.")
+            if qtd_parcelas > 156: st.warning("A quantidade máxima de parcelas permitida é 156.")
             # --- FIM DA MODIFICAÇÃO ---
 
             qtd_baloes = 0
@@ -629,11 +628,13 @@ def main():
     
     if submitted:
         try:
-            # --- INÍCIO DA MODIFICAÇÃO (Hamoa Jataí) ---
-            # Lógica de taxa para Hamoa Jataí (Juros a partir de 37 meses)
+            # --- INÍCIO DA MODIFICAÇÃO ---
+            # Lógica de taxa - Simulador 1
             if 1 <= qtd_parcelas <= 36: 
                 taxa_mensal_para_calculo = 0.0
-            elif 37 <= qtd_parcelas <= 180:
+            elif 37 <= qtd_parcelas <= 60:
+                taxa_mensal_para_calculo = 0.50
+            elif 61 <= qtd_parcelas <= 156:
                 taxa_mensal_para_calculo = 0.79
             else: # Cobre < 1 
                 taxa_mensal_para_calculo = 0.0
